@@ -8,8 +8,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tastamat.fandomon.ui.viewmodel.SettingsViewModel
@@ -19,17 +22,19 @@ import com.tastamat.fandomon.ui.viewmodel.SettingsViewModel
 fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Fandomon Settings") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+    // Force LTR (Left-to-Right) layout direction
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Fandomon Settings") },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 )
-            )
-        }
-    ) { paddingValues ->
+            }
+        ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -46,27 +51,81 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "Monitoring Control",
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Monitoring Control",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+
+                        // Status indicator
+                        if (state.isMonitoringActive) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    modifier = Modifier.size(8.dp),
+                                    shape = MaterialTheme.shapes.small,
+                                    color = MaterialTheme.colorScheme.primary
+                                ) {}
+                                Text(
+                                    text = "Active",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(
-                            onClick = { viewModel.startMonitoring() },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Start Monitoring")
+                        // Start button - filled when active, outlined when inactive
+                        if (state.isMonitoringActive) {
+                            Button(
+                                onClick = { viewModel.startMonitoring() },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                )
+                            ) {
+                                Text("Monitoring Active")
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = { viewModel.startMonitoring() },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Start Monitoring")
+                            }
                         }
 
-                        OutlinedButton(
-                            onClick = { viewModel.stopMonitoring() },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Stop Monitoring")
+                        // Stop button - filled when active, outlined when inactive
+                        if (state.isMonitoringActive) {
+                            FilledTonalButton(
+                                onClick = { viewModel.stopMonitoring() },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            ) {
+                                Text("Stop Monitoring")
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = { viewModel.stopMonitoring() },
+                                modifier = Modifier.weight(1f),
+                                enabled = false
+                            ) {
+                                Text("Stop Monitoring")
+                            }
                         }
                     }
                 }
@@ -89,14 +148,16 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                         value = state.deviceId,
                         onValueChange = { viewModel.updateDeviceId(it) },
                         label = { Text("Device ID") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
                     )
 
                     OutlinedTextField(
                         value = state.deviceName,
                         onValueChange = { viewModel.updateDeviceName(it) },
                         label = { Text("Device Name") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
                     )
                 }
             }
@@ -118,7 +179,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                         value = state.fandomatPackageName,
                         onValueChange = { viewModel.updateFandomatPackageName(it) },
                         label = { Text("Fandomat Package Name") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
                     )
 
                     OutlinedTextField(
@@ -130,7 +192,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                         },
                         label = { Text("Check Interval (minutes)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
                     )
 
                     OutlinedTextField(
@@ -142,8 +205,24 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                         },
                         label = { Text("Status Report Interval (minutes)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
                     )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Auto-Restart Fandomat",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Switch(
+                            checked = state.autoRestartEnabled,
+                            onCheckedChange = { viewModel.updateAutoRestartEnabled(it) }
+                        )
+                    }
                 }
             }
 
@@ -175,7 +254,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                             value = state.mqttBrokerUrl,
                             onValueChange = { viewModel.updateMqttBrokerUrl(it) },
                             label = { Text("Broker URL") },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
                         )
 
                         OutlinedTextField(
@@ -187,14 +267,16 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                             },
                             label = { Text("Port") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
                         )
 
                         OutlinedTextField(
                             value = state.mqttUsername,
                             onValueChange = { viewModel.updateMqttUsername(it) },
                             label = { Text("Username") },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
                         )
 
                         OutlinedTextField(
@@ -202,21 +284,32 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                             onValueChange = { viewModel.updateMqttPassword(it) },
                             label = { Text("Password") },
                             visualTransformation = PasswordVisualTransformation(),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
                         )
 
                         OutlinedTextField(
                             value = state.mqttTopicEvents,
-                            onValueChange = { viewModel.updateMqttBrokerUrl(it) },
+                            onValueChange = { viewModel.updateMqttTopicEvents(it) },
                             label = { Text("Events Topic") },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
                         )
 
                         OutlinedTextField(
                             value = state.mqttTopicStatus,
-                            onValueChange = { viewModel.updateMqttBrokerUrl(it) },
+                            onValueChange = { viewModel.updateMqttTopicStatus(it) },
                             label = { Text("Status Topic") },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                        )
+
+                        OutlinedTextField(
+                            value = state.mqttTopicCommands,
+                            onValueChange = { viewModel.updateMqttTopicCommands(it) },
+                            label = { Text("Commands Topic") },
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
                         )
                     }
                 }
@@ -250,7 +343,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                             value = state.restBaseUrl,
                             onValueChange = { viewModel.updateRestBaseUrl(it) },
                             label = { Text("Base URL") },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
                         )
 
                         OutlinedTextField(
@@ -258,11 +352,13 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                             onValueChange = { viewModel.updateRestApiKey(it) },
                             label = { Text("API Key") },
                             visualTransformation = PasswordVisualTransformation(),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
                         )
                     }
                 }
             }
         }
+    }
     }
 }

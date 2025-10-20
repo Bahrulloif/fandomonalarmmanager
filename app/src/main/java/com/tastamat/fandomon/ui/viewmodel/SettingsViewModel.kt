@@ -20,12 +20,15 @@ data class SettingsState(
     val mqttPassword: String = "",
     val mqttTopicEvents: String = "fandomon/events",
     val mqttTopicStatus: String = "fandomon/status",
+    val mqttTopicCommands: String = "fandomon/commands",
     val restEnabled: Boolean = false,
     val restBaseUrl: String = "",
     val restApiKey: String = "",
     val checkIntervalMinutes: Int = 5,
     val statusReportIntervalMinutes: Int = 15,
-    val fandomatPackageName: String = "com.tastamat.fandomat"
+    val fandomatPackageName: String = "com.tastamat.fandomat",
+    val autoRestartEnabled: Boolean = true,
+    val isMonitoringActive: Boolean = false  // New: track monitoring state
 )
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -52,12 +55,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 mqttPassword = preferences.mqttPassword.first(),
                 mqttTopicEvents = preferences.mqttTopicEvents.first(),
                 mqttTopicStatus = preferences.mqttTopicStatus.first(),
+                mqttTopicCommands = preferences.mqttTopicCommands.first(),
                 restEnabled = preferences.restEnabled.first(),
                 restBaseUrl = preferences.restBaseUrl.first(),
                 restApiKey = preferences.restApiKey.first(),
                 checkIntervalMinutes = preferences.checkIntervalMinutes.first(),
                 statusReportIntervalMinutes = preferences.statusReportIntervalMinutes.first(),
-                fandomatPackageName = preferences.fandomatPackageName.first()
+                fandomatPackageName = preferences.fandomatPackageName.first(),
+                autoRestartEnabled = preferences.autoRestartEnabled.first()
             )
         }
     }
@@ -111,6 +116,27 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun updateMqttTopicEvents(topic: String) {
+        viewModelScope.launch {
+            preferences.setMqttTopicEvents(topic)
+            _state.value = _state.value.copy(mqttTopicEvents = topic)
+        }
+    }
+
+    fun updateMqttTopicStatus(topic: String) {
+        viewModelScope.launch {
+            preferences.setMqttTopicStatus(topic)
+            _state.value = _state.value.copy(mqttTopicStatus = topic)
+        }
+    }
+
+    fun updateMqttTopicCommands(topic: String) {
+        viewModelScope.launch {
+            preferences.setMqttTopicCommands(topic)
+            _state.value = _state.value.copy(mqttTopicCommands = topic)
+        }
+    }
+
     fun updateRestEnabled(enabled: Boolean) {
         viewModelScope.launch {
             preferences.setRestEnabled(enabled)
@@ -155,16 +181,25 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun updateAutoRestartEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferences.setAutoRestartEnabled(enabled)
+            _state.value = _state.value.copy(autoRestartEnabled = enabled)
+        }
+    }
+
     fun startMonitoring() {
         viewModelScope.launch {
             val checkInterval = preferences.checkIntervalMinutes.first()
             val statusInterval = preferences.statusReportIntervalMinutes.first()
             alarmScheduler.scheduleMonitoring(checkInterval, statusInterval)
+            _state.value = _state.value.copy(isMonitoringActive = true)
         }
     }
 
     fun stopMonitoring() {
         alarmScheduler.cancelAllAlarms()
+        _state.value = _state.value.copy(isMonitoringActive = false)
     }
 
     private fun rescheduleAlarms() {

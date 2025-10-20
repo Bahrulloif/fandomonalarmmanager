@@ -3,11 +3,27 @@ package com.tastamat.fandomon.data.model
 enum class EventType {
     FANDOMAT_STOPPED,
     FANDOMAT_RESTARTED,
+    FANDOMAT_RESTARTING,  // New: notification that restart is in progress
+    FANDOMAT_RESTART_SUCCESS,  // New: notification that restart succeeded
+    FANDOMAT_NOT_RESPONDING,  // New: app is frozen/not responding
     INTERNET_DISCONNECTED,
     INTERNET_CONNECTED,
     POWER_OUTAGE,
     POWER_RESTORED,
     LOG_MISSING,
     APP_CRASH,
-    STATUS_UPDATE
+    STATUS_UPDATE,
+
+    // Remote command events
+    COMMAND_RESTART_FANDOMAT,
+    COMMAND_RESTART_FANDOMAT_FAILED,
+    COMMAND_RESTART_FANDOMON,
+    COMMAND_RESTART_FANDOMON_FAILED,
+    COMMAND_UPDATE_SETTINGS,
+    COMMAND_UPDATE_SETTINGS_FAILED,
+    COMMAND_CLEAR_EVENTS,
+    COMMAND_CLEAR_EVENTS_FAILED,
+    COMMAND_FORCE_SYNC,
+    COMMAND_GET_STATUS,
+    COMMAND_UNKNOWN
 }

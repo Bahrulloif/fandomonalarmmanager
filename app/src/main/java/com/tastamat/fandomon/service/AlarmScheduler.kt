@@ -31,34 +31,44 @@ class AlarmScheduler(private val context: Context) {
         )
 
         val intervalMillis = intervalMinutes * 60 * 1000L
-        val triggerTime = System.currentTimeMillis() + intervalMillis
+        var triggerTime = System.currentTimeMillis() + intervalMillis
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setRepeating(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerTime,
-                    intervalMillis,
-                    pendingIntent
-                )
-                Log.d(TAG, "Scheduled Fandomat check every $intervalMinutes minutes")
-            } else {
-                Log.w(TAG, "Cannot schedule exact alarms. Using inexact alarm.")
-                alarmManager.setInexactRepeating(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerTime,
-                    intervalMillis,
-                    pendingIntent
-                )
+        // Use setExactAndAllowWhileIdle for reliable execution even in Doze Mode
+        // This ensures monitoring works when device is idle/sleeping
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            // For Android 6.0+ (Doze Mode support)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (!alarmManager.canScheduleExactAlarms()) {
+                    Log.w(TAG, "⚠️ Cannot schedule exact alarms. Please grant SCHEDULE_EXACT_ALARM permission.")
+                    // Fallback to inexact alarm
+                    alarmManager.setInexactRepeating(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
+                        intervalMillis,
+                        pendingIntent
+                    )
+                    Log.d(TAG, "Using inexact alarm for Fandomat check every $intervalMinutes minutes")
+                    return
+                }
             }
+
+            // Schedule first alarm with setExactAndAllowWhileIdle
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                triggerTime,
+                pendingIntent
+            )
+            Log.d(TAG, "✅ Scheduled exact Fandomat check in $intervalMinutes minutes (works in Doze Mode)")
+            Log.d(TAG, "Next check at: ${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(triggerTime))}")
         } else {
+            // For Android 5.x and below, use setRepeating
             alarmManager.setRepeating(
                 AlarmManager.RTC_WAKEUP,
                 triggerTime,
                 intervalMillis,
                 pendingIntent
             )
-            Log.d(TAG, "Scheduled Fandomat check every $intervalMinutes minutes")
+            Log.d(TAG, "Scheduled Fandomat check every $intervalMinutes minutes (repeating)")
         }
     }
 
@@ -75,25 +85,30 @@ class AlarmScheduler(private val context: Context) {
         )
 
         val intervalMillis = intervalMinutes * 60 * 1000L
-        val triggerTime = System.currentTimeMillis() + intervalMillis
+        var triggerTime = System.currentTimeMillis() + intervalMillis
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setRepeating(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerTime,
-                    intervalMillis,
-                    pendingIntent
-                )
-                Log.d(TAG, "Scheduled status report every $intervalMinutes minutes")
-            } else {
-                alarmManager.setInexactRepeating(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerTime,
-                    intervalMillis,
-                    pendingIntent
-                )
+        // Use setExactAndAllowWhileIdle for status reports too
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (!alarmManager.canScheduleExactAlarms()) {
+                    Log.w(TAG, "⚠️ Cannot schedule exact alarms for status report.")
+                    alarmManager.setInexactRepeating(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
+                        intervalMillis,
+                        pendingIntent
+                    )
+                    Log.d(TAG, "Using inexact alarm for status report every $intervalMinutes minutes")
+                    return
+                }
             }
+
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                triggerTime,
+                pendingIntent
+            )
+            Log.d(TAG, "✅ Scheduled exact status report in $intervalMinutes minutes")
         } else {
             alarmManager.setRepeating(
                 AlarmManager.RTC_WAKEUP,
@@ -101,7 +116,7 @@ class AlarmScheduler(private val context: Context) {
                 intervalMillis,
                 pendingIntent
             )
-            Log.d(TAG, "Scheduled status report every $intervalMinutes minutes")
+            Log.d(TAG, "Scheduled status report every $intervalMinutes minutes (repeating)")
         }
     }
 

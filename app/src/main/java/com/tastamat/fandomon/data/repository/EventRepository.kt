@@ -19,5 +19,7 @@ class EventRepository(private val eventDao: EventDao) {
         eventDao.deleteOldEvents(cutoffTime)
     }
 
+    suspend fun deleteAllEvents(): Int = eventDao.deleteAllEvents()
+
     suspend fun getEventById(eventId: Long): MonitorEvent? = eventDao.getEventById(eventId)
 }

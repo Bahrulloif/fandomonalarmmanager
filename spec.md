@@ -16,8 +16,8 @@
 - [x] Tracking the state of Fandomon itself (background service, status reporting).  
 - [x] Auto-restart of the Fandomat application if stopped.  
 - [x] Storing events in a local SQLite database.  
-- [x] Sending events and statuses via **MQTT** or **REST API**.  
-- [ ] Remote administration (optional).  
+- [x] Sending events and statuses via **MQTT** or **REST API**.
+- [x] Remote administration via MQTT commands.  
 
 ## 3. User Flows
 - **Flow 1**: Fandomat stops working → Fandomon detects the event → attempts to restart Fandomat → event saved in SQLite → event sent to server (MQTT/REST).  
@@ -115,8 +115,17 @@
    - API_EXAMPLES.md with server implementation examples
    - Architecture documentation
 
+### 🎯 Recent Additions (Phase 2)
+
+8. **Remote Commands System**
+   - CommandHandler for command parsing and execution
+   - MQTT subscribe functionality for bidirectional communication
+   - 6 command types: RESTART_FANDOMAT, RESTART_FANDOMON, UPDATE_SETTINGS, CLEAR_EVENTS, FORCE_SYNC, GET_STATUS
+   - Command event logging and tracking
+   - Real-time command execution with error handling
+
 ### 🔄 Future Enhancements
-   - Remote administration panel
-   - Real-time notifications
+   - Web-based remote administration panel
+   - Push notifications for critical events
    - Advanced analytics dashboard
    - Log file collection from Fandomat

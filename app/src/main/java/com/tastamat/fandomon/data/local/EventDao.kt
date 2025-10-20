@@ -24,6 +24,9 @@ interface EventDao {
     @Query("DELETE FROM monitor_events WHERE timestamp < :beforeTimestamp")
     suspend fun deleteOldEvents(beforeTimestamp: Long)
 
+    @Query("DELETE FROM monitor_events")
+    suspend fun deleteAllEvents(): Int
+
     @Query("SELECT * FROM monitor_events WHERE id = :eventId")
     suspend fun getEventById(eventId: Long): MonitorEvent?
 }

@@ -1,0 +1,260 @@
+package com.tastamat.fandomon.service
+
+import android.content.Context
+import android.content.Intent
+import android.util.Log
+import com.tastamat.fandomon.data.local.FandomonDatabase
+import com.tastamat.fandomon.data.model.CommandType
+import com.tastamat.fandomon.data.model.EventType
+import com.tastamat.fandomon.data.model.MonitorEvent
+import com.tastamat.fandomon.data.model.RemoteCommand
+import com.tastamat.fandomon.data.preferences.AppPreferences
+import com.tastamat.fandomon.data.repository.EventRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import org.json.JSONObject
+
+class CommandHandler(private val context: Context) {
+
+    private val TAG = "CommandHandler"
+    private val eventRepository = EventRepository(FandomonDatabase.getDatabase(context).eventDao())
+    private val preferences = AppPreferences(context)
+
+    /**
+     * Parse incoming MQTT command message
+     */
+    fun parseCommand(jsonString: String): RemoteCommand? {
+        return try {
+            val json = JSONObject(jsonString)
+            val commandStr = json.optString("command", "")
+            val commandType = when (commandStr.uppercase()) {
+                "RESTART_FANDOMAT" -> CommandType.RESTART_FANDOMAT
+                "RESTART_FANDOMON" -> CommandType.RESTART_FANDOMON
+                "UPDATE_SETTINGS" -> CommandType.UPDATE_SETTINGS
+                "CLEAR_EVENTS" -> CommandType.CLEAR_EVENTS
+                "FORCE_SYNC" -> CommandType.FORCE_SYNC
+                "GET_STATUS" -> CommandType.GET_STATUS
+                else -> CommandType.UNKNOWN
+            }
+
+            // Parse parameters if present
+            val parameters = mutableMapOf<String, String>()
+            if (json.has("parameters")) {
+                val paramsJson = json.getJSONObject("parameters")
+                paramsJson.keys().forEach { key ->
+                    parameters[key] = paramsJson.getString(key)
+                }
+            }
+
+            RemoteCommand(
+                command = commandType,
+                parameters = parameters,
+                timestamp = json.optLong("timestamp", System.currentTimeMillis())
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing command: ${e.message}", e)
+            null
+        }
+    }
+
+    /**
+     * Execute remote command
+     */
+    fun executeCommand(command: RemoteCommand) {
+        Log.d(TAG, "🎯 Executing command: ${command.command}")
+
+        when (command.command) {
+            CommandType.RESTART_FANDOMAT -> restartFandomat(command.parameters)
+            CommandType.RESTART_FANDOMON -> restartFandomon()
+            CommandType.UPDATE_SETTINGS -> updateSettings(command.parameters)
+            CommandType.CLEAR_EVENTS -> clearEvents()
+            CommandType.FORCE_SYNC -> forceSync()
+            CommandType.GET_STATUS -> sendImmediateStatus()
+            CommandType.UNKNOWN -> {
+                Log.w(TAG, "⚠️ Unknown command received")
+                CoroutineScope(Dispatchers.IO).launch {
+                    logCommandEvent("COMMAND_UNKNOWN", "Unknown command received")
+                }
+            }
+        }
+    }
+
+    private fun restartFandomat(parameters: Map<String, String>) {
+        Log.d(TAG, "🔄 Executing RESTART_FANDOMAT command")
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val packageName = preferences.fandomatPackageName.first()
+
+                // Method 1: Try ADB shell command
+                val command = "am start -n $packageName/.MainActivity"
+                Log.d(TAG, "Executing shell command: $command")
+                Runtime.getRuntime().exec(command)
+
+                logCommandEvent(
+                    "COMMAND_RESTART_FANDOMAT",
+                    "Remote restart command executed for $packageName"
+                )
+                Log.d(TAG, "✅ RESTART_FANDOMAT command executed successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error executing RESTART_FANDOMAT: ${e.message}", e)
+                logCommandEvent(
+                    "COMMAND_RESTART_FANDOMAT_FAILED",
+                    "Failed to restart Fandomat: ${e.message}"
+                )
+            }
+        }
+    }
+
+    private fun restartFandomon() {
+        Log.d(TAG, "🔄 Executing RESTART_FANDOMON command")
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Log the restart command
+                logCommandEvent(
+                    "COMMAND_RESTART_FANDOMON",
+                    "Remote restart command received - restarting Fandomon"
+                )
+
+                // Cancel all alarms
+                AlarmScheduler(context).cancelAllAlarms()
+
+                // Restart the app by launching MainActivity with NEW_TASK flag
+                val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+
+                // Small delay to ensure event is logged
+                Thread.sleep(500)
+
+                if (intent != null) {
+                    context.startActivity(intent)
+                    Log.d(TAG, "✅ RESTART_FANDOMON command executed - app restarting")
+
+                    // Exit current process to force restart
+                    android.os.Process.killProcess(android.os.Process.myPid())
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error executing RESTART_FANDOMON: ${e.message}", e)
+                logCommandEvent(
+                    "COMMAND_RESTART_FANDOMON_FAILED",
+                    "Failed to restart Fandomon: ${e.message}"
+                )
+            }
+        }
+    }
+
+    private fun updateSettings(parameters: Map<String, String>) {
+        Log.d(TAG, "⚙️ Executing UPDATE_SETTINGS command")
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Update settings based on parameters
+                parameters.forEach { (key, value) ->
+                    when (key) {
+                        "check_interval" -> {
+                            val interval = value.toIntOrNull() ?: return@forEach
+                            preferences.setCheckIntervalMinutes(interval)
+                            Log.d(TAG, "Updated check_interval to $interval")
+                        }
+                        "status_interval" -> {
+                            val interval = value.toIntOrNull() ?: return@forEach
+                            preferences.setStatusReportIntervalMinutes(interval)
+                            Log.d(TAG, "Updated status_interval to $interval")
+                        }
+                        "device_name" -> {
+                            preferences.setDeviceName(value)
+                            Log.d(TAG, "Updated device_name to $value")
+                        }
+                        else -> Log.w(TAG, "Unknown setting: $key")
+                    }
+                }
+
+                logCommandEvent(
+                    "COMMAND_UPDATE_SETTINGS",
+                    "Settings updated via remote command: ${parameters.keys.joinToString()}"
+                )
+                Log.d(TAG, "✅ UPDATE_SETTINGS command executed successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error executing UPDATE_SETTINGS: ${e.message}", e)
+                logCommandEvent(
+                    "COMMAND_UPDATE_SETTINGS_FAILED",
+                    "Failed to update settings: ${e.message}"
+                )
+            }
+        }
+    }
+
+    private fun clearEvents() {
+        Log.d(TAG, "🗑️ Executing CLEAR_EVENTS command")
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val deletedCount = eventRepository.deleteAllEvents()
+                logCommandEvent(
+                    "COMMAND_CLEAR_EVENTS",
+                    "Cleared $deletedCount events from database"
+                )
+                Log.d(TAG, "✅ CLEAR_EVENTS command executed - deleted $deletedCount events")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error executing CLEAR_EVENTS: ${e.message}", e)
+                logCommandEvent(
+                    "COMMAND_CLEAR_EVENTS_FAILED",
+                    "Failed to clear events: ${e.message}"
+                )
+            }
+        }
+    }
+
+    private fun forceSync() {
+        Log.d(TAG, "🔄 Executing FORCE_SYNC command")
+        try {
+            // Trigger immediate sync by sending broadcast
+            val intent = Intent(context, MonitoringReceiver::class.java).apply {
+                action = MonitoringReceiver.ACTION_SYNC_EVENTS
+            }
+            context.sendBroadcast(intent)
+
+            CoroutineScope(Dispatchers.IO).launch {
+                logCommandEvent(
+                    "COMMAND_FORCE_SYNC",
+                    "Force sync triggered via remote command"
+                )
+            }
+            Log.d(TAG, "✅ FORCE_SYNC command executed successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error executing FORCE_SYNC: ${e.message}", e)
+        }
+    }
+
+    private fun sendImmediateStatus() {
+        Log.d(TAG, "📊 Executing GET_STATUS command")
+        try {
+            // Trigger immediate status report
+            val intent = Intent(context, MonitoringReceiver::class.java).apply {
+                action = MonitoringReceiver.ACTION_SEND_STATUS
+            }
+            context.sendBroadcast(intent)
+
+            CoroutineScope(Dispatchers.IO).launch {
+                logCommandEvent(
+                    "COMMAND_GET_STATUS",
+                    "Immediate status report requested via remote command"
+                )
+            }
+            Log.d(TAG, "✅ GET_STATUS command executed successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error executing GET_STATUS: ${e.message}", e)
+        }
+    }
+
+    private suspend fun logCommandEvent(eventType: String, message: String) {
+        try {
+            val event = MonitorEvent(
+                eventType = EventType.valueOf(eventType),
+                message = message
+            )
+            eventRepository.insertEvent(event)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error logging command event: ${e.message}", e)
+        }
+    }
+}

@@ -32,12 +32,17 @@ adb install app/build/outputs/apk/debug/app-debug.apk
    - Точное планирование (Android 12+)
    - Приложение автоматически запросит необходимые разрешения
 
-2. **Настройте параметры Fandomat**:
+2. **Настройте устройство**:
+   - Device ID: `device-001` (уникальный ID для идентификации устройства)
+   - Device Name: `Tablet Warehouse A` (понятное имя устройства)
+   - Если не заполнено, используются значения по умолчанию
+
+3. **Настройте параметры Fandomat**:
    - Package Name: `com.tastamat.fandomat` (измените на свой)
    - Check Interval: `5` минут (как часто проверять Fandomat)
    - Status Report Interval: `15` минут (как часто отправлять статус)
 
-3. **Настройте MQTT** (если используете):
+4. **Настройте MQTT** (если используете):
    - Включите переключатель MQTT
    - Broker URL: `mqtt.example.com` (ваш брокер)
    - Port: `1883`
@@ -46,12 +51,12 @@ adb install app/build/outputs/apk/debug/app-debug.apk
    - Events Topic: `fandomon/events`
    - Status Topic: `fandomon/status`
 
-4. **Настройте REST API** (если используете):
+5. **Настройте REST API** (если используете):
    - Включите переключатель REST
    - Base URL: `https://api.example.com/`
    - API Key: `********`
 
-5. **Запустите мониторинг**:
+6. **Запустите мониторинг**:
    - Нажмите кнопку **"Start Monitoring"**
    - Приложение начнет работать в фоновом режиме
 

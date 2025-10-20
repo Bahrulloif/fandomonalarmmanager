@@ -20,6 +20,7 @@ class DataSyncService(private val context: Context) {
     private val preferences = AppPreferences(context)
     private val mqttClient = MqttClientManager(context)
     private val gson = Gson()
+    private val commandHandler = CommandHandler(context)
 
     suspend fun syncEvents() {
         try {
@@ -29,12 +30,15 @@ class DataSyncService(private val context: Context) {
                 return
             }
 
+            Log.d(TAG, "📤 Syncing ${unsentEvents.size} unsent events in chronological order")
+
             val deviceId = getDeviceId()
             val deviceName = getDeviceName()
             val mqttEnabled = preferences.mqttEnabled.first()
             val restEnabled = preferences.restEnabled.first()
 
             for (event in unsentEvents) {
+                Log.d(TAG, "📤 Sending event #${event.id}: ${event.eventType} (timestamp: ${event.timestamp})")
                 val eventDto = EventDto(
                     id = event.id,
                     eventType = event.eventType.name,
@@ -202,6 +206,85 @@ class DataSyncService(private val context: Context) {
             customDeviceName
         } else {
             android.os.Build.MODEL ?: "Unknown Device"
+        }
+    }
+
+    /**
+     * Subscribe to MQTT commands topic for remote control
+     */
+    suspend fun subscribeToCommands() {
+        try {
+            val mqttEnabled = preferences.mqttEnabled.first()
+            if (!mqttEnabled) {
+                Log.d(TAG, "MQTT is disabled, skipping command subscription")
+                return
+            }
+
+            val brokerUrl = preferences.mqttBrokerUrl.first()
+            val port = preferences.mqttPort.first()
+            val username = preferences.mqttUsername.first()
+            val password = preferences.mqttPassword.first()
+
+            if (brokerUrl.isEmpty()) {
+                Log.w(TAG, "MQTT broker URL is not configured")
+                return
+            }
+
+            // Connect to MQTT if not already connected
+            if (!mqttClient.isConnected()) {
+                var connected = false
+                mqttClient.connect(
+                    brokerUrl = brokerUrl,
+                    port = port,
+                    username = username,
+                    password = password,
+                    onSuccess = {
+                        connected = true
+                        Log.d(TAG, "✅ Connected to MQTT broker for commands")
+                    },
+                    onFailure = {
+                        connected = false
+                        Log.e(TAG, "❌ Failed to connect to MQTT broker")
+                    }
+                )
+                Thread.sleep(2000) // Wait for connection
+                if (!connected) return
+            }
+
+            // Subscribe to commands topic
+            val commandsTopic = preferences.mqttTopicCommands.first()
+            mqttClient.subscribe(
+                topic = commandsTopic,
+                qos = 1,
+                onMessageReceived = { topic, message ->
+                    Log.d(TAG, "📥 Command received on [$topic]: $message")
+                    handleIncomingCommand(message)
+                },
+                onSuccess = {
+                    Log.d(TAG, "✅ Subscribed to commands topic: $commandsTopic")
+                },
+                onFailure = { error ->
+                    Log.e(TAG, "❌ Failed to subscribe to commands: ${error.message}")
+                }
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error subscribing to commands", e)
+        }
+    }
+
+    private fun handleIncomingCommand(message: String) {
+        try {
+            Log.d(TAG, "🔍 Parsing command: $message")
+            val command = commandHandler.parseCommand(message)
+
+            if (command != null) {
+                Log.d(TAG, "✅ Command parsed successfully: ${command.command}")
+                commandHandler.executeCommand(command)
+            } else {
+                Log.w(TAG, "⚠️ Failed to parse command")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling command: ${e.message}", e)
         }
     }
 

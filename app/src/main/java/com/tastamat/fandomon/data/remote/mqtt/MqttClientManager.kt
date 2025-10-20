@@ -68,6 +68,57 @@ class MqttClientManager(private val context: Context) {
         }
     }
 
+    fun subscribe(
+        topic: String,
+        qos: Int = 1,
+        onMessageReceived: (String, String) -> Unit,
+        onSuccess: () -> Unit = {},
+        onFailure: (Throwable) -> Unit = {}
+    ) {
+        try {
+            if (mqttClient?.isConnected != true) {
+                Log.w(TAG, "MQTT client is not connected")
+                onFailure(Exception("MQTT client is not connected"))
+                return
+            }
+
+            // Set callback for incoming messages
+            mqttClient?.setCallback(object : MqttCallback {
+                override fun connectionLost(cause: Throwable?) {
+                    Log.w(TAG, "Connection lost: ${cause?.message}")
+                }
+
+                override fun messageArrived(topic: String?, message: MqttMessage?) {
+                    if (topic != null && message != null) {
+                        val payload = String(message.payload)
+                        Log.d(TAG, "Message received on topic [$topic]: $payload")
+                        onMessageReceived(topic, payload)
+                    }
+                }
+
+                override fun deliveryComplete(token: IMqttDeliveryToken?) {
+                    // Not used for subscribe
+                }
+            })
+
+            mqttClient?.subscribe(topic, qos)
+            Log.d(TAG, "Subscribed to topic: $topic")
+            onSuccess()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error subscribing to topic", e)
+            onFailure(e)
+        }
+    }
+
+    fun unsubscribe(topic: String) {
+        try {
+            mqttClient?.unsubscribe(topic)
+            Log.d(TAG, "Unsubscribed from topic: $topic")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unsubscribing from topic", e)
+        }
+    }
+
     fun disconnect() {
         try {
             mqttClient?.disconnect()

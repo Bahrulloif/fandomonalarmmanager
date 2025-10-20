@@ -22,6 +22,7 @@ class AppPreferences(private val context: Context) {
         val MQTT_PASSWORD = stringPreferencesKey("mqtt_password")
         val MQTT_TOPIC_EVENTS = stringPreferencesKey("mqtt_topic_events")
         val MQTT_TOPIC_STATUS = stringPreferencesKey("mqtt_topic_status")
+        val MQTT_TOPIC_COMMANDS = stringPreferencesKey("mqtt_topic_commands")
 
         val REST_ENABLED = booleanPreferencesKey("rest_enabled")
         val REST_BASE_URL = stringPreferencesKey("rest_base_url")
@@ -30,6 +31,7 @@ class AppPreferences(private val context: Context) {
         val CHECK_INTERVAL_MINUTES = intPreferencesKey("check_interval_minutes")
         val STATUS_REPORT_INTERVAL_MINUTES = intPreferencesKey("status_report_interval_minutes")
         val FANDOMAT_PACKAGE_NAME = stringPreferencesKey("fandomat_package_name")
+        val AUTO_RESTART_ENABLED = booleanPreferencesKey("auto_restart_enabled")
     }
 
     val deviceId: Flow<String> = context.dataStore.data.map { it[DEVICE_ID] ?: "" }
@@ -42,6 +44,7 @@ class AppPreferences(private val context: Context) {
     val mqttPassword: Flow<String> = context.dataStore.data.map { it[MQTT_PASSWORD] ?: "" }
     val mqttTopicEvents: Flow<String> = context.dataStore.data.map { it[MQTT_TOPIC_EVENTS] ?: "fandomon/events" }
     val mqttTopicStatus: Flow<String> = context.dataStore.data.map { it[MQTT_TOPIC_STATUS] ?: "fandomon/status" }
+    val mqttTopicCommands: Flow<String> = context.dataStore.data.map { it[MQTT_TOPIC_COMMANDS] ?: "fandomon/commands" }
 
     val restEnabled: Flow<Boolean> = context.dataStore.data.map { it[REST_ENABLED] ?: false }
     val restBaseUrl: Flow<String> = context.dataStore.data.map { it[REST_BASE_URL] ?: "" }
@@ -50,6 +53,7 @@ class AppPreferences(private val context: Context) {
     val checkIntervalMinutes: Flow<Int> = context.dataStore.data.map { it[CHECK_INTERVAL_MINUTES] ?: 5 }
     val statusReportIntervalMinutes: Flow<Int> = context.dataStore.data.map { it[STATUS_REPORT_INTERVAL_MINUTES] ?: 15 }
     val fandomatPackageName: Flow<String> = context.dataStore.data.map { it[FANDOMAT_PACKAGE_NAME] ?: "com.tastamat.fandomat" }
+    val autoRestartEnabled: Flow<Boolean> = context.dataStore.data.map { it[AUTO_RESTART_ENABLED] ?: true }
 
     suspend fun setDeviceId(deviceId: String) {
         context.dataStore.edit { it[DEVICE_ID] = deviceId }
@@ -87,6 +91,10 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { it[MQTT_TOPIC_STATUS] = topic }
     }
 
+    suspend fun setMqttTopicCommands(topic: String) {
+        context.dataStore.edit { it[MQTT_TOPIC_COMMANDS] = topic }
+    }
+
     suspend fun setRestEnabled(enabled: Boolean) {
         context.dataStore.edit { it[REST_ENABLED] = enabled }
     }
@@ -109,5 +117,9 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setFandomatPackageName(packageName: String) {
         context.dataStore.edit { it[FANDOMAT_PACKAGE_NAME] = packageName }
+    }
+
+    suspend fun setAutoRestartEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[AUTO_RESTART_ENABLED] = enabled }
     }
 }
