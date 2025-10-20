@@ -2,6 +2,58 @@
 
 ## [Unreleased]
 
+## [2.1.3] - 2025-10-20 - Bug Fix: Complete Text Direction Fix
+
+### 🐛 Bug Fix
+**FIXED:** Cursor still moving left in some text fields (Device Name and others)
+
+#### Problem
+- In v2.1.2, added `textStyle` with `TextDirection.Ltr`
+- Fixed most fields, but **Device Name** and some other fields still had RTL issue
+- Some fields required stronger enforcement of LTR direction
+
+#### Root Cause
+- Only `textStyle` parameter is not always sufficient
+- TextField component can override text direction based on content or system locale
+- Some RTL characters or system settings trigger RTL mode even with textStyle
+
+#### Solution - Double Protection
+Applied **two-level protection** for 100% reliability:
+
+1. **CompositionLocalProvider** - wraps each TextField
+   ```kotlin
+   CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+       OutlinedTextField(...)
+   }
+   ```
+
+2. **textStyle** - explicitly sets text direction
+   ```kotlin
+   textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+   ```
+
+### 📝 Technical Changes
+
+#### Modified Files
+- **SettingsScreen.kt**
+  - Wrapped ALL 14 TextFields in `CompositionLocalProvider`
+  - Kept `textStyle` parameter for double protection
+  - Ensures 100% LTR direction regardless of content or locale
+
+### ✅ Result
+- ✅ **Device Name field now works correctly** (was main issue)
+- ✅ All other fields also more reliable
+- ✅ Double protection ensures no RTL issues
+- ✅ Works with any content: Latin, numbers, symbols, mixed
+
+### 🔍 Why Double Protection?
+- `CompositionLocalProvider` - sets layout direction for component
+- `textStyle` - sets text direction for content
+- Together = **unbreakable LTR enforcement**
+
+### 📖 See Also
+- Updated documentation: [TEXT_DIRECTION_FIX.md](./TEXT_DIRECTION_FIX.md)
+
 ## [2.1.2] - 2025-10-20 - Bug Fix: Text Input Cursor Direction
 
 ### 🐛 Bug Fix

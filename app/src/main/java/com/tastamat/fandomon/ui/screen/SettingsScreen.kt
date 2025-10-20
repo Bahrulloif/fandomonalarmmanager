@@ -144,21 +144,25 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                         style = MaterialTheme.typography.titleMedium
                     )
 
-                    OutlinedTextField(
-                        value = state.deviceId,
-                        onValueChange = { viewModel.updateDeviceId(it) },
-                        label = { Text("Device ID") },
-                        modifier = Modifier.fillMaxWidth(),
-                        textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
-                    )
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        OutlinedTextField(
+                            value = state.deviceId,
+                            onValueChange = { viewModel.updateDeviceId(it) },
+                            label = { Text("Device ID") },
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                        )
+                    }
 
-                    OutlinedTextField(
-                        value = state.deviceName,
-                        onValueChange = { viewModel.updateDeviceName(it) },
-                        label = { Text("Device Name") },
-                        modifier = Modifier.fillMaxWidth(),
-                        textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
-                    )
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        OutlinedTextField(
+                            value = state.deviceName,
+                            onValueChange = { viewModel.updateDeviceName(it) },
+                            label = { Text("Device Name") },
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                        )
+                    }
                 }
             }
 
@@ -175,39 +179,45 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                         style = MaterialTheme.typography.titleMedium
                     )
 
-                    OutlinedTextField(
-                        value = state.fandomatPackageName,
-                        onValueChange = { viewModel.updateFandomatPackageName(it) },
-                        label = { Text("Fandomat Package Name") },
-                        modifier = Modifier.fillMaxWidth(),
-                        textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
-                    )
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        OutlinedTextField(
+                            value = state.fandomatPackageName,
+                            onValueChange = { viewModel.updateFandomatPackageName(it) },
+                            label = { Text("Fandomat Package Name") },
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                        )
+                    }
 
-                    OutlinedTextField(
-                        value = state.checkIntervalMinutes.toString(),
-                        onValueChange = {
-                            it.toIntOrNull()?.let { minutes ->
-                                viewModel.updateCheckInterval(minutes)
-                            }
-                        },
-                        label = { Text("Check Interval (minutes)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                        textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
-                    )
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        OutlinedTextField(
+                            value = state.checkIntervalMinutes.toString(),
+                            onValueChange = {
+                                it.toIntOrNull()?.let { minutes ->
+                                    viewModel.updateCheckInterval(minutes)
+                                }
+                            },
+                            label = { Text("Check Interval (minutes)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                        )
+                    }
 
-                    OutlinedTextField(
-                        value = state.statusReportIntervalMinutes.toString(),
-                        onValueChange = {
-                            it.toIntOrNull()?.let { minutes ->
-                                viewModel.updateStatusReportInterval(minutes)
-                            }
-                        },
-                        label = { Text("Status Report Interval (minutes)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                        textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
-                    )
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        OutlinedTextField(
+                            value = state.statusReportIntervalMinutes.toString(),
+                            onValueChange = {
+                                it.toIntOrNull()?.let { minutes ->
+                                    viewModel.updateStatusReportInterval(minutes)
+                                }
+                            },
+                            label = { Text("Status Report Interval (minutes)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                        )
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -250,67 +260,81 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                     }
 
                     if (state.mqttEnabled) {
-                        OutlinedTextField(
-                            value = state.mqttBrokerUrl,
-                            onValueChange = { viewModel.updateMqttBrokerUrl(it) },
-                            label = { Text("Broker URL") },
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
-                        )
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            OutlinedTextField(
+                                value = state.mqttBrokerUrl,
+                                onValueChange = { viewModel.updateMqttBrokerUrl(it) },
+                                label = { Text("Broker URL") },
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                            )
+                        }
 
-                        OutlinedTextField(
-                            value = state.mqttPort.toString(),
-                            onValueChange = {
-                                it.toIntOrNull()?.let { port ->
-                                    viewModel.updateMqttPort(port)
-                                }
-                            },
-                            label = { Text("Port") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
-                        )
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            OutlinedTextField(
+                                value = state.mqttPort.toString(),
+                                onValueChange = {
+                                    it.toIntOrNull()?.let { port ->
+                                        viewModel.updateMqttPort(port)
+                                    }
+                                },
+                                label = { Text("Port") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                            )
+                        }
 
-                        OutlinedTextField(
-                            value = state.mqttUsername,
-                            onValueChange = { viewModel.updateMqttUsername(it) },
-                            label = { Text("Username") },
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
-                        )
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            OutlinedTextField(
+                                value = state.mqttUsername,
+                                onValueChange = { viewModel.updateMqttUsername(it) },
+                                label = { Text("Username") },
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                            )
+                        }
 
-                        OutlinedTextField(
-                            value = state.mqttPassword,
-                            onValueChange = { viewModel.updateMqttPassword(it) },
-                            label = { Text("Password") },
-                            visualTransformation = PasswordVisualTransformation(),
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
-                        )
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            OutlinedTextField(
+                                value = state.mqttPassword,
+                                onValueChange = { viewModel.updateMqttPassword(it) },
+                                label = { Text("Password") },
+                                visualTransformation = PasswordVisualTransformation(),
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                            )
+                        }
 
-                        OutlinedTextField(
-                            value = state.mqttTopicEvents,
-                            onValueChange = { viewModel.updateMqttTopicEvents(it) },
-                            label = { Text("Events Topic") },
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
-                        )
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            OutlinedTextField(
+                                value = state.mqttTopicEvents,
+                                onValueChange = { viewModel.updateMqttTopicEvents(it) },
+                                label = { Text("Events Topic") },
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                            )
+                        }
 
-                        OutlinedTextField(
-                            value = state.mqttTopicStatus,
-                            onValueChange = { viewModel.updateMqttTopicStatus(it) },
-                            label = { Text("Status Topic") },
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
-                        )
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            OutlinedTextField(
+                                value = state.mqttTopicStatus,
+                                onValueChange = { viewModel.updateMqttTopicStatus(it) },
+                                label = { Text("Status Topic") },
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                            )
+                        }
 
-                        OutlinedTextField(
-                            value = state.mqttTopicCommands,
-                            onValueChange = { viewModel.updateMqttTopicCommands(it) },
-                            label = { Text("Commands Topic") },
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
-                        )
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            OutlinedTextField(
+                                value = state.mqttTopicCommands,
+                                onValueChange = { viewModel.updateMqttTopicCommands(it) },
+                                label = { Text("Commands Topic") },
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                            )
+                        }
                     }
                 }
             }
@@ -339,22 +363,26 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                     }
 
                     if (state.restEnabled) {
-                        OutlinedTextField(
-                            value = state.restBaseUrl,
-                            onValueChange = { viewModel.updateRestBaseUrl(it) },
-                            label = { Text("Base URL") },
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
-                        )
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            OutlinedTextField(
+                                value = state.restBaseUrl,
+                                onValueChange = { viewModel.updateRestBaseUrl(it) },
+                                label = { Text("Base URL") },
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                            )
+                        }
 
-                        OutlinedTextField(
-                            value = state.restApiKey,
-                            onValueChange = { viewModel.updateRestApiKey(it) },
-                            label = { Text("API Key") },
-                            visualTransformation = PasswordVisualTransformation(),
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
-                        )
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            OutlinedTextField(
+                                value = state.restApiKey,
+                                onValueChange = { viewModel.updateRestApiKey(it) },
+                                label = { Text("API Key") },
+                                visualTransformation = PasswordVisualTransformation(),
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                            )
+                        }
                     }
                 }
             }

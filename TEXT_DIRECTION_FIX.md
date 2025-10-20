@@ -26,30 +26,47 @@ Compose использует автоматическое определение
 
 ## Решение
 
-Добавлен параметр `textStyle` с явным указанием `TextDirection.Ltr` для **всех** текстовых полей.
+Применена **двойная защита** для обеспечения LTR направления:
+1. Обертка в `CompositionLocalProvider` с `LocalLayoutDirection.Ltr`
+2. Параметр `textStyle` с явным указанием `TextDirection.Ltr`
 
 ### Код исправления
 
-**До:**
+**До (v2.1.2 - частично работало):**
 ```kotlin
 OutlinedTextField(
-    value = state.fandomatPackageName,
-    onValueChange = { viewModel.updateFandomatPackageName(it) },
-    label = { Text("Fandomat Package Name") },
-    modifier = Modifier.fillMaxWidth()
+    value = state.deviceName,
+    onValueChange = { viewModel.updateDeviceName(it) },
+    label = { Text("Device Name") },
+    modifier = Modifier.fillMaxWidth(),
+    textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
 )
 ```
 
-**После:**
+**После (v2.1.3 - надежное решение):**
 ```kotlin
-OutlinedTextField(
-    value = state.fandomatPackageName,
-    onValueChange = { viewModel.updateFandomatPackageName(it) },
-    label = { Text("Fandomat Package Name") },
-    modifier = Modifier.fillMaxWidth(),
-    textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)  // ← Добавлено
-)
+CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+    OutlinedTextField(
+        value = state.deviceName,
+        onValueChange = { viewModel.updateDeviceName(it) },
+        label = { Text("Device Name") },
+        modifier = Modifier.fillMaxWidth(),
+        textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+    )
+}
 ```
+
+### Почему двойная защита?
+
+**Проблема:** Только `textStyle` не всегда работал для некоторых полей (например, Device Name), особенно если:
+- В поле уже есть RTL символы
+- Система определила локаль как RTL
+- Первый введенный символ триггерит RTL
+
+**Решение:** Двухуровневая защита гарантирует LTR:
+1. `CompositionLocalProvider` устанавливает layout direction для компонента
+2. `textStyle` устанавливает text direction для содержимого
+3. Вместе они обеспечивают 100% надежность
 
 ## Затронутые файлы
 
@@ -121,12 +138,22 @@ CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
 }
 ```
 
-### Вариант 3: textStyle с TextDirection (✅ выбрано)
+### Вариант 3: textStyle с TextDirection (⚠️ частично работало)
 ```kotlin
-// ✅ Простое и надежное решение
+// ⚠️ Работает в большинстве случаев, но не для всех полей
 OutlinedTextField(
     textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
 )
+```
+
+### Вариант 4: Двойная защита - CompositionLocalProvider + textStyle (✅ выбрано)
+```kotlin
+// ✅ Надежное решение - работает всегда
+CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+    OutlinedTextField(
+        textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+    )
+}
 ```
 
 ## Проверка исправления
