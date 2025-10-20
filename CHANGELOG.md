@@ -2,6 +2,99 @@
 
 ## [Unreleased]
 
+## [2.1.4] - 2025-10-20 - Bug Fix: Number Fields Input
+
+### 🐛 Bug Fix
+**FIXED:** Cannot delete text in number fields (Check Interval, Status Interval, MQTT Port)
+
+#### Problem
+- Impossible to completely clear number input fields
+- When user deleted all text, field immediately restored old value
+- Made it very difficult to enter new values from scratch
+- Affected 3 fields: Check Interval, Status Interval, MQTT Port
+
+#### Root Cause
+- Fields directly bound to ViewModel state: `value = state.checkIntervalMinutes.toString()`
+- When field empty, `"".toIntOrNull()` returns `null`
+- ViewModel not updated when `null`
+- Recomposition restores old value from state
+- User cannot clear field
+
+#### Solution - Local State Pattern
+Applied **local state** for text representation separate from numeric ViewModel value:
+
+**Architecture:**
+```
+TextField (String) ← Local State (allows empty)
+    ↓ Validation
+ViewModel (Int) ← Only if valid number
+```
+
+**Implementation:**
+1. Local state variable for text: `var checkIntervalText by remember { ... }`
+2. LaunchedEffect to sync with ViewModel changes
+3. TextField uses local state
+4. Update ViewModel only when valid number entered
+5. Allow empty field temporarily
+
+### 📝 Technical Changes
+
+#### Modified Files
+- **SettingsScreen.kt**
+  - Added local state for 3 number fields
+  - Added LaunchedEffect for syncing with ViewModel
+  - Added validation with visual feedback
+  - Check Interval: validates > 0
+  - Status Interval: validates > 0
+  - MQTT Port: validates 1-65535 range
+
+- **NUMBER_FIELDS_FIX.md**
+  - Complete technical documentation
+  - Problem analysis and solution
+  - Testing guide
+
+### ✨ New Features
+
+#### Visual Validation
+- **Red border** when invalid input
+- **Error message** below field:
+  - "Please enter a valid number" (intervals)
+  - "Port must be between 1 and 65535" (port)
+- **No error** for empty field (allowed temporarily)
+
+#### Smart Validation
+- **Check/Status Interval**: Only positive numbers (> 0)
+- **MQTT Port**: Only valid TCP ports (1-65535)
+- **ViewModel protection**: Invalid values never reach ViewModel
+
+### ✅ Result
+
+**Before:**
+```
+User: *tries to delete "5"*
+Field: "5" (can't delete)
+User: *confused*
+```
+
+**After:**
+```
+User: *deletes "5"*
+Field: "" (empty) ✓
+User: *types "10"*
+Field: "10" ✓ (saved to ViewModel)
+```
+
+### 🎯 User Experience
+
+- ✅ Can delete all text in number fields
+- ✅ Can enter new values from scratch
+- ✅ Real-time validation with visual feedback
+- ✅ Clear error messages
+- ✅ ViewModel protected from invalid values
+
+### 📖 See Also
+- Technical documentation: [NUMBER_FIELDS_FIX.md](./NUMBER_FIELDS_FIX.md)
+
 ## [2.1.3] - 2025-10-20 - Bug Fix: Complete Text Direction Fix
 
 ### 🐛 Bug Fix

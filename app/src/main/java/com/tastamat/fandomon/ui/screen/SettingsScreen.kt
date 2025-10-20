@@ -22,6 +22,22 @@ import com.tastamat.fandomon.ui.viewmodel.SettingsViewModel
 fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
 
+    // Local state for number fields to allow empty input
+    var checkIntervalText by remember { mutableStateOf(state.checkIntervalMinutes.toString()) }
+    var statusIntervalText by remember { mutableStateOf(state.statusReportIntervalMinutes.toString()) }
+    var mqttPortText by remember { mutableStateOf(state.mqttPort.toString()) }
+
+    // Update local state when state changes
+    LaunchedEffect(state.checkIntervalMinutes) {
+        checkIntervalText = state.checkIntervalMinutes.toString()
+    }
+    LaunchedEffect(state.statusReportIntervalMinutes) {
+        statusIntervalText = state.statusReportIntervalMinutes.toString()
+    }
+    LaunchedEffect(state.mqttPort) {
+        mqttPortText = state.mqttPort.toString()
+    }
+
     // Force LTR (Left-to-Right) layout direction
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Scaffold(
@@ -191,31 +207,55 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
 
                     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                         OutlinedTextField(
-                            value = state.checkIntervalMinutes.toString(),
-                            onValueChange = {
-                                it.toIntOrNull()?.let { minutes ->
-                                    viewModel.updateCheckInterval(minutes)
+                            value = checkIntervalText,
+                            onValueChange = { newValue ->
+                                checkIntervalText = newValue
+                                // Only update ViewModel if valid number or empty
+                                if (newValue.isEmpty()) {
+                                    // Keep current value in ViewModel, just allow empty field
+                                } else {
+                                    newValue.toIntOrNull()?.let { minutes ->
+                                        if (minutes > 0) {
+                                            viewModel.updateCheckInterval(minutes)
+                                        }
+                                    }
                                 }
                             },
                             label = { Text("Check Interval (minutes)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
+                            isError = checkIntervalText.isNotEmpty() && checkIntervalText.toIntOrNull() == null,
+                            supportingText = if (checkIntervalText.isNotEmpty() && checkIntervalText.toIntOrNull() == null) {
+                                { Text("Please enter a valid number") }
+                            } else null
                         )
                     }
 
                     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                         OutlinedTextField(
-                            value = state.statusReportIntervalMinutes.toString(),
-                            onValueChange = {
-                                it.toIntOrNull()?.let { minutes ->
-                                    viewModel.updateStatusReportInterval(minutes)
+                            value = statusIntervalText,
+                            onValueChange = { newValue ->
+                                statusIntervalText = newValue
+                                // Only update ViewModel if valid number or empty
+                                if (newValue.isEmpty()) {
+                                    // Keep current value in ViewModel, just allow empty field
+                                } else {
+                                    newValue.toIntOrNull()?.let { minutes ->
+                                        if (minutes > 0) {
+                                            viewModel.updateStatusReportInterval(minutes)
+                                        }
+                                    }
                                 }
                             },
                             label = { Text("Status Report Interval (minutes)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
+                            isError = statusIntervalText.isNotEmpty() && statusIntervalText.toIntOrNull() == null,
+                            supportingText = if (statusIntervalText.isNotEmpty() && statusIntervalText.toIntOrNull() == null) {
+                                { Text("Please enter a valid number") }
+                            } else null
                         )
                     }
 
@@ -272,16 +312,28 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
 
                         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                             OutlinedTextField(
-                                value = state.mqttPort.toString(),
-                                onValueChange = {
-                                    it.toIntOrNull()?.let { port ->
-                                        viewModel.updateMqttPort(port)
+                                value = mqttPortText,
+                                onValueChange = { newValue ->
+                                    mqttPortText = newValue
+                                    // Only update ViewModel if valid number or empty
+                                    if (newValue.isEmpty()) {
+                                        // Keep current value in ViewModel, just allow empty field
+                                    } else {
+                                        newValue.toIntOrNull()?.let { port ->
+                                            if (port in 1..65535) {
+                                                viewModel.updateMqttPort(port)
+                                            }
+                                        }
                                     }
                                 },
                                 label = { Text("Port") },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.fillMaxWidth(),
-                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
+                                isError = mqttPortText.isNotEmpty() && (mqttPortText.toIntOrNull() == null || mqttPortText.toIntOrNull() !in 1..65535),
+                                supportingText = if (mqttPortText.isNotEmpty() && (mqttPortText.toIntOrNull() == null || mqttPortText.toIntOrNull() !in 1..65535)) {
+                                    { Text("Port must be between 1 and 65535") }
+                                } else null
                             )
                         }
 
