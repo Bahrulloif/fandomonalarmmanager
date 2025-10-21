@@ -62,7 +62,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 checkIntervalMinutes = preferences.checkIntervalMinutes.first(),
                 statusReportIntervalMinutes = preferences.statusReportIntervalMinutes.first(),
                 fandomatPackageName = preferences.fandomatPackageName.first(),
-                autoRestartEnabled = preferences.autoRestartEnabled.first()
+                autoRestartEnabled = preferences.autoRestartEnabled.first(),
+                isMonitoringActive = preferences.monitoringActive.first()
             )
         }
     }
@@ -193,13 +194,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             val checkInterval = preferences.checkIntervalMinutes.first()
             val statusInterval = preferences.statusReportIntervalMinutes.first()
             alarmScheduler.scheduleMonitoring(checkInterval, statusInterval)
+            preferences.setMonitoringActive(true)
             _state.value = _state.value.copy(isMonitoringActive = true)
         }
     }
 
     fun stopMonitoring() {
-        alarmScheduler.cancelAllAlarms()
-        _state.value = _state.value.copy(isMonitoringActive = false)
+        viewModelScope.launch {
+            alarmScheduler.cancelAllAlarms()
+            preferences.setMonitoringActive(false)
+            _state.value = _state.value.copy(isMonitoringActive = false)
+        }
     }
 
     private fun rescheduleAlarms() {

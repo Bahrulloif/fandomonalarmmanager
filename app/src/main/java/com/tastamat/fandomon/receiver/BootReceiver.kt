@@ -17,20 +17,28 @@ class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            Log.d(TAG, "Device booted, scheduling monitoring alarms")
+            Log.d(TAG, "Device booted, checking if monitoring should be restarted")
 
             val pendingResult = goAsync()
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val preferences = AppPreferences(context)
-                    val checkInterval = preferences.checkIntervalMinutes.first()
-                    val statusInterval = preferences.statusReportIntervalMinutes.first()
+                    val wasMonitoringActive = preferences.monitoringActive.first()
 
-                    val scheduler = AlarmScheduler(context)
-                    scheduler.scheduleMonitoring(checkInterval, statusInterval)
+                    if (wasMonitoringActive) {
+                        Log.d(TAG, "✅ Monitoring was active before reboot, restarting...")
 
-                    Log.d(TAG, "Monitoring alarms scheduled after boot")
+                        val checkInterval = preferences.checkIntervalMinutes.first()
+                        val statusInterval = preferences.statusReportIntervalMinutes.first()
+
+                        val scheduler = AlarmScheduler(context)
+                        scheduler.scheduleMonitoring(checkInterval, statusInterval)
+
+                        Log.d(TAG, "✅ Monitoring alarms scheduled after boot (check: ${checkInterval}min, status: ${statusInterval}min)")
+                    } else {
+                        Log.d(TAG, "⏸️ Monitoring was not active before reboot, skipping auto-start")
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error scheduling alarms after boot", e)
                 } finally {
