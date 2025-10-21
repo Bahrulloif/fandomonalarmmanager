@@ -46,7 +46,8 @@ class MainActivity : ComponentActivity() {
                 var showOnboarding by remember {
                     mutableStateOf(
                         !PermissionUtils.hasUsageStatsPermission(this) ||
-                        !PermissionUtils.isAccessibilityServiceEnabled(this)
+                        !PermissionUtils.isAccessibilityServiceEnabled(this) ||
+                        !PermissionUtils.hasStoragePermission(this)
                     )
                 }
 

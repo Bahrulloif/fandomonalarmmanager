@@ -24,9 +24,10 @@ fun OnboardingScreen(
     val notificationsEnabled = remember { mutableStateOf<Boolean>(PermissionUtils.areNotificationsEnabled(context)) }
     val exactAlarmsOk = remember { mutableStateOf<Boolean>(PermissionUtils.canScheduleExactAlarms(context)) }
     val accessibilityEnabled = remember { mutableStateOf<Boolean>(PermissionUtils.isAccessibilityServiceEnabled(context)) }
+    val storageGranted = remember { mutableStateOf<Boolean>(PermissionUtils.hasStoragePermission(context)) }
     val isXiaomi = remember { mutableStateOf<Boolean>(XiaomiUtils.isXiaomiDevice()) }
 
-    val allOk = usageGranted.value && notificationsEnabled.value && exactAlarmsOk.value && accessibilityEnabled.value
+    val allOk = usageGranted.value && notificationsEnabled.value && exactAlarmsOk.value && accessibilityEnabled.value && storageGranted.value
 
     Scaffold(
         topBar = {
@@ -126,6 +127,28 @@ fun OnboardingScreen(
                         }
                         OutlinedButton(onClick = {
                             accessibilityEnabled.value = PermissionUtils.isAccessibilityServiceEnabled(context)
+                        }) {
+                            Text("Re-check")
+                        }
+                    }
+                }
+            }
+
+            // Storage permission for heartbeat file
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("File Access for Freeze Detection", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Needed to read Fandomat's heartbeat log (messages.log) to detect if app is frozen. " +
+                        "This is how Fandomon knows when Fandomat crashes or stops responding.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { PermissionUtils.requestStoragePermission(context) }) {
+                            Text(if (storageGranted.value) "Granted ✓" else "Grant Permission")
+                        }
+                        OutlinedButton(onClick = {
+                            storageGranted.value = PermissionUtils.hasStoragePermission(context)
                         }) {
                             Text("Re-check")
                         }

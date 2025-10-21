@@ -7,6 +7,7 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Environment
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -17,6 +18,10 @@ import com.tastamat.fandomon.data.model.MonitorEvent
 import com.tastamat.fandomon.data.preferences.AppPreferences
 import com.tastamat.fandomon.data.repository.EventRepository
 import kotlinx.coroutines.flow.first
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class FandomatMonitor(private val context: Context) {
 
@@ -132,39 +137,68 @@ class FandomatMonitor(private val context: Context) {
 
     /**
      * Check if app is responding (not frozen)
-     * Uses activity launch time to detect if app is stuck
+     * Uses Fandomat's heartbeat mechanism via messages.log file
+     *
+     * Fandomat writes log entries every N seconds (configured by user).
+     * If no new log entry for more than 3 minutes → app is frozen/crashed
      */
     private fun checkIfAppResponding(packageName: String): Boolean {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-                val currentTime = System.currentTimeMillis()
-                val queryTime = currentTime - (5 * 60 * 1000) // Last 5 minutes
+            Log.d(TAG, "📊 Checking heartbeat for $packageName...")
 
-                val usageStats = usageStatsManager.queryUsageStats(
-                    UsageStatsManager.INTERVAL_BEST,
-                    queryTime,
-                    currentTime
-                )
+            // Path to Fandomat's heartbeat log file
+            val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val logFile = File(downloadDir, "messages.log")
 
-                val appStats = usageStats?.find { it.packageName == packageName }
-                if (appStats != null) {
-                    // Check if app has been in foreground for too long without any interaction
-                    // If lastTimeUsed is more than 30 minutes old, app might be frozen
-                    val timeSinceLastUse = currentTime - appStats.lastTimeUsed
-                    val thirtyMinutes = 30 * 60 * 1000L
-
-                    if (timeSinceLastUse > thirtyMinutes) {
-                        Log.w(TAG, "⚠️ App hasn't been used for ${timeSinceLastUse / 60000} minutes - might be frozen")
-                        return false
-                    }
-                }
+            if (!logFile.exists()) {
+                Log.w(TAG, "⚠️ Heartbeat log file not found: ${logFile.absolutePath}")
+                // If file doesn't exist, assume app is responding (might be first run)
+                return true
             }
 
-            // If we can't determine, assume it's responding
+            // Read last line from log file
+            val lastLine = logFile.readLines().lastOrNull()
+            if (lastLine == null || lastLine.isEmpty()) {
+                Log.w(TAG, "⚠️ Heartbeat log file is empty")
+                return true
+            }
+
+            // Parse timestamp from log line format: [2025-10-21 19:36:09] Log entry #2: application running normally
+            val timestampRegex = """\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]""".toRegex()
+            val matchResult = timestampRegex.find(lastLine)
+
+            if (matchResult == null) {
+                Log.w(TAG, "⚠️ Could not parse timestamp from log line: $lastLine")
+                return true
+            }
+
+            val timestampStr = matchResult.groupValues[1]
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+            val lastHeartbeat = dateFormat.parse(timestampStr)
+
+            if (lastHeartbeat == null) {
+                Log.w(TAG, "⚠️ Could not parse date: $timestampStr")
+                return true
+            }
+
+            // Calculate time since last heartbeat
+            val currentTime = System.currentTimeMillis()
+            val timeSinceHeartbeat = currentTime - lastHeartbeat.time
+            val threeMinutes = 3 * 60 * 1000L
+
+            val minutesAgo = timeSinceHeartbeat / 60000
+            Log.d(TAG, "📊 Last heartbeat: $timestampStr (${minutesAgo} minutes ago)")
+
+            if (timeSinceHeartbeat > threeMinutes) {
+                Log.w(TAG, "⚠️ No heartbeat for $minutesAgo minutes - Fandomat might be FROZEN!")
+                return false
+            }
+
+            Log.d(TAG, "✅ Heartbeat OK - last update ${minutesAgo} minutes ago")
             return true
+
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking if app is responding: ${e.message}", e)
+            Log.e(TAG, "Error checking heartbeat: ${e.message}", e)
             return true // Assume responding if we can't check
         }
     }
