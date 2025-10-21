@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Fandomon2</string>
+    <string name="accessibility_service_description">Allows Fandomon to automatically launch monitored applications when they stop. This service does not collect any personal data and only launches apps when requested by the monitoring system.</string>
 </resources>

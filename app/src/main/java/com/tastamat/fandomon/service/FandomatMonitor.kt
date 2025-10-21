@@ -281,33 +281,66 @@ class FandomatMonitor(private val context: Context) {
                 Log.w(TAG, "⚠️ Shell command error: ${shellError.message}, trying alternative method...")
             }
 
-            // Method 2: Use high-priority notification with PendingIntent (works on Android 10+)
-            // This is allowed because notifications can start activities even from background
-            Log.d(TAG, "Trying notification-based restart for Android 10+...")
+            // Method 2: Use Accessibility Service (FULLY AUTOMATIC on Android 10+)
+            // This service can launch apps from background without user interaction
+            if (AppLauncherAccessibilityService.isEnabled(context)) {
+                Log.d(TAG, "🤖 Trying Accessibility Service for AUTOMATIC restart...")
+
+                AppLauncherAccessibilityService.requestAppLaunch(context, packageName)
+
+                // Give service time to launch the app
+                Thread.sleep(3000)
+
+                val isNowRunning = isAppInForeground(packageName)
+                if (isNowRunning) {
+                    val successEvent = MonitorEvent(
+                        eventType = EventType.FANDOMAT_RESTART_SUCCESS,
+                        message = "Fandomat AUTO-restarted via Accessibility Service (no user interaction!)"
+                    )
+                    eventRepository.insertEvent(successEvent)
+                    Log.d(TAG, "✅✅✅ Fandomat AUTO-restarted successfully - NO USER INTERACTION NEEDED!")
+                    return true
+                } else {
+                    val event = MonitorEvent(
+                        eventType = EventType.FANDOMAT_RESTARTED,
+                        message = "Accessibility Service launch requested - app should start automatically"
+                    )
+                    eventRepository.insertEvent(event)
+                    Log.d(TAG, "📱 Accessibility Service launch requested")
+                    return true
+                }
+            } else {
+                Log.w(TAG, "⚠️ Accessibility Service NOT enabled - CANNOT auto-restart without user tap")
+                Log.w(TAG, "⚠️ Enable: Settings → Accessibility → Fandomon Auto Launcher")
+            }
+
+            // Method 3: Use high-priority notification with PendingIntent (requires user tap)
+            // This is a fallback if Accessibility Service is not enabled
+            Log.d(TAG, "Trying notification-based restart (REQUIRES USER TO TAP)...")
             val notificationSuccess = sendRestartNotification(packageName)
 
             if (notificationSuccess) {
                 Log.d(TAG, "✅ Restart notification sent successfully")
 
-                // Wait for user to tap notification or auto-launch
+                // Wait for user to tap notification
                 Thread.sleep(2000)
 
                 val isNowRunning = isAppInForeground(packageName)
                 if (isNowRunning) {
                     val successEvent = MonitorEvent(
                         eventType = EventType.FANDOMAT_RESTART_SUCCESS,
-                        message = "Fandomat successfully restarted via notification"
+                        message = "Fandomat restarted via notification tap"
                     )
                     eventRepository.insertEvent(successEvent)
-                    Log.d(TAG, "✅ Fandomat restarted successfully via notification")
+                    Log.d(TAG, "✅ Fandomat restarted via notification tap")
                     return true
                 } else {
                     val event = MonitorEvent(
                         eventType = EventType.FANDOMAT_RESTARTED,
-                        message = "Restart notification sent - waiting for app to start"
+                        message = "Restart notification sent - WAITING FOR USER TO TAP"
                     )
                     eventRepository.insertEvent(event)
-                    Log.d(TAG, "📱 Notification sent, app should start when tapped")
+                    Log.d(TAG, "📱 Notification sent, WAITING FOR USER TO TAP")
                     return true
                 }
             }
