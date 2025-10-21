@@ -20,6 +20,7 @@ import com.tastamat.fandomon.service.DataSyncService
 import com.tastamat.fandomon.ui.screen.SettingsScreen
 import com.tastamat.fandomon.ui.theme.Fandomon2Theme
 import com.tastamat.fandomon.utils.PermissionUtils
+import com.tastamat.fandomon.utils.XiaomiUtils
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -89,6 +90,9 @@ class MainActivity : ComponentActivity() {
             // Check battery optimization
             checkBatteryOptimization()
 
+            // Check Xiaomi autostart permission
+            checkXiaomiAutostart()
+
             // Subscribe to MQTT commands after permissions are granted
             subscribeToMqttCommands()
         }
@@ -118,6 +122,31 @@ class MainActivity : ComponentActivity() {
             } else {
                 Log.d("MainActivity", "✅ Battery optimization already disabled for this app")
             }
+        }
+    }
+
+    private fun checkXiaomiAutostart() {
+        if (XiaomiUtils.isXiaomiDevice()) {
+            Log.w("MainActivity", "⚠️ XIAOMI/MIUI DEVICE DETECTED!")
+            Log.w("MainActivity", "⚠️ You MUST enable Autostart for this app to work after reboot")
+
+            XiaomiUtils.logDeviceInfo()
+
+            // Open autostart settings after a delay
+            window.decorView.postDelayed({
+                try {
+                    Log.d("MainActivity", "📱 Opening Xiaomi Autostart settings...")
+                    val opened = XiaomiUtils.openAutoStartSettings(this)
+                    if (opened) {
+                        Log.d("MainActivity", "✅ Autostart settings opened - please enable Fandomon")
+                    } else {
+                        Log.w("MainActivity", "⚠️ Could not open autostart settings automatically")
+                        Log.w("MainActivity", "⚠️ Please manually enable: Security app → Autostart → Enable Fandomon")
+                    }
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Error opening Xiaomi autostart settings", e)
+                }
+            }, 4000) // 4 second delay after battery optimization
         }
     }
 
