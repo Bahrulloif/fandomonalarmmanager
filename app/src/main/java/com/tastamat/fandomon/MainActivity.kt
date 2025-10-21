@@ -44,7 +44,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             Fandomon2Theme {
                 var showOnboarding by remember {
-                    mutableStateOf(!PermissionUtils.hasUsageStatsPermission(this))
+                    mutableStateOf(
+                        !PermissionUtils.hasUsageStatsPermission(this) ||
+                        !PermissionUtils.isAccessibilityServiceEnabled(this)
+                    )
                 }
 
                 if (showOnboarding) {

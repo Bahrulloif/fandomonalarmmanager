@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
+import android.text.TextUtils
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 
@@ -128,6 +129,56 @@ object PermissionUtils {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error opening exact alarm settings", e)
+        }
+    }
+
+    /**
+     * Check if Accessibility Service is enabled for the app
+     */
+    fun isAccessibilityServiceEnabled(context: Context): Boolean {
+        return try {
+            val expectedComponentName = "${context.packageName}/com.tastamat.fandomon.service.AppLauncherAccessibilityService"
+            val enabledServicesSetting = Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            )
+
+            if (enabledServicesSetting.isNullOrEmpty()) {
+                Log.d(TAG, "Accessibility Service: NOT enabled (no services found)")
+                return false
+            }
+
+            val colonSplitter = TextUtils.SimpleStringSplitter(':')
+            colonSplitter.setString(enabledServicesSetting)
+
+            while (colonSplitter.hasNext()) {
+                val componentName = colonSplitter.next()
+                if (componentName.equals(expectedComponentName, ignoreCase = true)) {
+                    Log.d(TAG, "Accessibility Service: ENABLED ✅")
+                    return true
+                }
+            }
+
+            Log.d(TAG, "Accessibility Service: NOT enabled (not in list)")
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking Accessibility Service", e)
+            false
+        }
+    }
+
+    /**
+     * Open Accessibility settings
+     */
+    fun openAccessibilitySettings(context: Context) {
+        try {
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            Log.d(TAG, "Opened Accessibility settings")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error opening Accessibility settings", e)
         }
     }
 }

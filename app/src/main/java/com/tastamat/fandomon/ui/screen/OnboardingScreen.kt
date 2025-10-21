@@ -23,9 +23,10 @@ fun OnboardingScreen(
     val usageGranted = remember { mutableStateOf<Boolean>(PermissionUtils.hasUsageStatsPermission(context)) }
     val notificationsEnabled = remember { mutableStateOf<Boolean>(PermissionUtils.areNotificationsEnabled(context)) }
     val exactAlarmsOk = remember { mutableStateOf<Boolean>(PermissionUtils.canScheduleExactAlarms(context)) }
+    val accessibilityEnabled = remember { mutableStateOf<Boolean>(PermissionUtils.isAccessibilityServiceEnabled(context)) }
     val isXiaomi = remember { mutableStateOf<Boolean>(XiaomiUtils.isXiaomiDevice()) }
 
-    val allOk = usageGranted.value && notificationsEnabled.value && exactAlarmsOk.value
+    val allOk = usageGranted.value && notificationsEnabled.value && exactAlarmsOk.value && accessibilityEnabled.value
 
     Scaffold(
         topBar = {
@@ -79,6 +80,55 @@ fun OnboardingScreen(
                     Text("Required for reliable monitoring in Doze mode.")
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { exactAlarmsOk.value = PermissionUtils.canScheduleExactAlarms(context) }) { Text("Re-check") }
+                    }
+                }
+            }
+
+            // Accessibility Service - CRITICAL for automatic restart
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = if (!accessibilityEnabled.value) {
+                    CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                } else {
+                    CardDefaults.cardColors()
+                }
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Fandomon Auto Launcher (CRITICAL)",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (!accessibilityEnabled.value) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        "REQUIRED for automatic restart without user interaction on Android 10+. " +
+                        "Without this, you will receive notifications that require manual tapping.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        "How to enable:\n" +
+                        "1. Tap 'Open Settings' below\n" +
+                        "2. Find 'Fandomon Auto Launcher' in the list\n" +
+                        "3. Turn it ON\n" +
+                        "4. Tap 'Allow' in the confirmation dialog",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { PermissionUtils.openAccessibilitySettings(context) },
+                            colors = if (!accessibilityEnabled.value) {
+                                ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                            } else {
+                                ButtonDefaults.buttonColors()
+                            }
+                        ) {
+                            Text(if (accessibilityEnabled.value) "Enabled ✓" else "Open Settings")
+                        }
+                        OutlinedButton(onClick = {
+                            accessibilityEnabled.value = PermissionUtils.isAccessibilityServiceEnabled(context)
+                        }) {
+                            Text("Re-check")
+                        }
                     }
                 }
             }
