@@ -16,8 +16,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.compose.runtime.*
 import com.tastamat.fandomon.data.preferences.AppPreferences
 import com.tastamat.fandomon.service.DataSyncService
+import com.tastamat.fandomon.ui.screen.OnboardingScreen
 import com.tastamat.fandomon.ui.screen.SettingsScreen
 import com.tastamat.fandomon.ui.theme.Fandomon2Theme
 import com.tastamat.fandomon.utils.PermissionUtils
@@ -39,93 +41,34 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        requestRequiredPermissions()
-        checkAndRequestUsageStatsPermission()
-
         setContent {
             Fandomon2Theme {
-                SettingsScreen()
-            }
-        }
-    }
+                var showOnboarding by remember {
+                    mutableStateOf(!PermissionUtils.hasUsageStatsPermission(this))
+                }
 
-    private fun requestRequiredPermissions() {
-        val permissionsToRequest = mutableListOf<String>()
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.SCHEDULE_EXACT_ALARM
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                permissionsToRequest.add(Manifest.permission.SCHEDULE_EXACT_ALARM)
-            }
-        }
-
-        if (permissionsToRequest.isNotEmpty()) {
-            requestPermissionLauncher.launch(permissionsToRequest.toTypedArray())
-        }
-    }
-
-    private fun checkAndRequestUsageStatsPermission() {
-        if (!PermissionUtils.hasUsageStatsPermission(this)) {
-            Log.d("MainActivity", "⚠️ UsageStats permission not granted")
-            Log.d("MainActivity", "📱 Opening settings to grant permission...")
-
-            // Delay to ensure UI is ready
-            window.decorView.postDelayed({
-                PermissionUtils.requestUsageStatsPermission(this)
-            }, 1000) // 1 second delay to show main screen first
-        } else {
-            Log.d("MainActivity", "✅ UsageStats permission already granted")
-
-            // Check battery optimization
-            checkBatteryOptimization()
-
-            // Check Xiaomi autostart permission
-            checkXiaomiAutostart()
-
-            // Subscribe to MQTT commands after permissions are granted
-            subscribeToMqttCommands()
-        }
-    }
-
-    private fun checkBatteryOptimization() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-            val packageName = packageName
-
-            if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
-                Log.d("MainActivity", "⚠️ App is subject to battery optimization")
-                Log.d("MainActivity", "📱 Requesting battery optimization exemption...")
-
-                // Show dialog to user explaining why we need this
-                window.decorView.postDelayed({
-                    try {
-                        val intent = Intent().apply {
-                            action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
-                            data = Uri.parse("package:$packageName")
+                if (showOnboarding) {
+                    OnboardingScreen(
+                        onComplete = {
+                            showOnboarding = false
+                            // Subscribe to MQTT after permissions granted
+                            subscribeToMqttCommands()
                         }
-                        startActivity(intent)
-                    } catch (e: Exception) {
-                        Log.e("MainActivity", "Error requesting battery optimization exemption", e)
+                    )
+                } else {
+                    SettingsScreen()
+                    // Subscribe to MQTT if permissions already granted
+                    LaunchedEffect(Unit) {
+                        subscribeToMqttCommands()
                     }
-                }, 2000) // 2 second delay after UsageStats permission
-            } else {
-                Log.d("MainActivity", "✅ Battery optimization already disabled for this app")
+                }
             }
         }
+
+        // Check Xiaomi autostart (background task)
+        checkXiaomiAutostart()
     }
+
 
     private fun checkXiaomiAutostart() {
         if (XiaomiUtils.isXiaomiDevice()) {
