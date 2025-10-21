@@ -132,18 +132,23 @@ class AppLauncherAccessibilityService : AccessibilityService() {
 
     private fun launchApp(packageName: String) {
         try {
-            Log.d(TAG, "🚀 Launching app: $packageName")
+            Log.d(TAG, "🚀 Launching app TO FOREGROUND: $packageName")
 
             val intent = packageManager.getLaunchIntentForPackage(packageName)
             if (intent != null) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                // Flags to ensure app comes to FOREGROUND (visible on screen)
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)        // Create new task
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)       // Clear activities above
+                intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)      // Don't duplicate if already on top
+                intent.addFlags(Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT) // Bring to front if exists
+                intent.addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED) // Reset task state
 
                 // Accessibility service CAN launch activities from background!
+                // This will make the app VISIBLE on screen (foreground)
                 startActivity(intent)
 
-                Log.d(TAG, "✅ Successfully launched: $packageName")
+                Log.d(TAG, "✅ Successfully launched TO FOREGROUND: $packageName")
+                Log.d(TAG, "📱 App should now be VISIBLE on screen")
             } else {
                 Log.e(TAG, "❌ Launch intent not found for: $packageName")
             }

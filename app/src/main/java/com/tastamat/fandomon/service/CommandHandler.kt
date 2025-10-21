@@ -101,23 +101,24 @@ class CommandHandler(private val context: Context) {
     }
 
     private fun restartFandomat() {
-        Log.d(TAG, "🔄 Executing RESTART_FANDOMAT command - FORCE RESTART")
+        Log.d(TAG, "🔄 Executing RESTART_FANDOMAT command - FORCE RESTART TO FOREGROUND")
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val packageName = preferences.fandomatPackageName.first()
 
                 logCommandEvent(
                     "COMMAND_RESTART_FANDOMAT",
-                    "Remote FORCE RESTART command received for $packageName"
+                    "Remote FORCE RESTART command - bringing Fandomat to foreground"
                 )
 
                 // Step 1: FORCE STOP the app first (kills it completely)
-                Log.d(TAG, "⏹️ Step 1: Force stopping $packageName...")
+                // This ensures we do a REAL restart, not just bring to front
+                Log.d(TAG, "⏹️ Step 1: Force stopping $packageName to ensure clean restart...")
                 try {
                     val stopCommand = "am force-stop $packageName"
                     val stopProcess = Runtime.getRuntime().exec(stopCommand)
                     stopProcess.waitFor()
-                    Log.d(TAG, "✅ Force stop completed")
+                    Log.d(TAG, "✅ Force stop completed - Fandomat process killed")
                 } catch (e: Exception) {
                     Log.w(TAG, "⚠️ Force stop failed: ${e.message}")
                 }
@@ -125,28 +126,34 @@ class CommandHandler(private val context: Context) {
                 // Wait for app to fully stop
                 kotlinx.coroutines.delay(2000)
 
-                // Step 2: START the app (now it's a real restart)
-                Log.d(TAG, "🚀 Step 2: Starting $packageName...")
+                // Step 2: START the app and BRING TO FOREGROUND (make it visible)
+                Log.d(TAG, "🚀 Step 2: Starting $packageName and bringing to FOREGROUND...")
                 try {
                     // Try multiple methods in priority order
 
                     // Method 1: Accessibility Service (BEST - works on Android 10+)
+                    // This AUTOMATICALLY brings app to foreground
                     if (AppLauncherAccessibilityService.isEnabled(context)) {
-                        Log.d(TAG, "🤖 Using Accessibility Service to launch app")
+                        Log.d(TAG, "🤖 Using Accessibility Service to launch app TO FOREGROUND")
                         AppLauncherAccessibilityService.requestAppLaunch(context, packageName)
                         kotlinx.coroutines.delay(3000)
-                        Log.d(TAG, "✅ Accessibility Service launch requested")
+                        Log.d(TAG, "✅ Accessibility Service launched - Fandomat should be VISIBLE on screen")
                     } else {
-                        Log.w(TAG, "⚠️ Accessibility Service not enabled, using shell command")
+                        Log.w(TAG, "⚠️ Accessibility Service not enabled, using shell command with FOREGROUND flags")
 
-                        // Method 2: Shell command (may not work on Android 10+)
-                        val startCommand = "am start -n $packageName/.MainActivity"
+                        // Method 2: Shell command WITH FLAGS to bring to foreground
+                        // -W = wait for launch to complete
+                        // -S = force stop before starting (redundant but ensures it)
+                        // These flags ensure the app comes to FOREGROUND (visible)
+                        val startCommand = "am start -W -S -n $packageName/.MainActivity"
                         Log.d(TAG, "Executing: $startCommand")
+                        Log.d(TAG, "📱 Flags: -W (wait) -S (stop first) → ensures app visible on screen")
                         Runtime.getRuntime().exec(startCommand)
                         kotlinx.coroutines.delay(2000)
                     }
 
-                    Log.d(TAG, "✅ RESTART_FANDOMAT command executed - app should be restarting")
+                    Log.d(TAG, "✅ RESTART_FANDOMAT command executed - Fandomat should now be VISIBLE (foreground)")
+                    Log.d(TAG, "📱 If you see Fandomon screen, switch to home - Fandomat should be there")
                 } catch (e: Exception) {
                     Log.e(TAG, "❌ Error starting app: ${e.message}", e)
                     logCommandEvent(
