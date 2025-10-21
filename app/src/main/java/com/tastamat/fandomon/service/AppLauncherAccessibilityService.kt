@@ -49,12 +49,18 @@ class AppLauncherAccessibilityService : AccessibilityService() {
          * Check if accessibility service is enabled
          */
         fun isEnabled(context: Context): Boolean {
-            val service = "${context.packageName}/${AppLauncherAccessibilityService::class.java.name}"
+            // Check both short form (/.service.ClassName) and full form (/com.package.service.ClassName)
+            val shortForm = "${context.packageName}/.service.AppLauncherAccessibilityService"
+            val fullForm = "${context.packageName}/${AppLauncherAccessibilityService::class.java.name}"
+
             val settingsValue = android.provider.Settings.Secure.getString(
                 context.contentResolver,
                 android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
             )
-            return settingsValue?.contains(service) == true
+
+            val isEnabled = settingsValue?.contains(shortForm) == true || settingsValue?.contains(fullForm) == true
+            Log.d(TAG, "Accessibility Service enabled: $isEnabled (settings: $settingsValue)")
+            return isEnabled
         }
     }
 
