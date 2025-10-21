@@ -190,7 +190,7 @@ class FandomatMonitor(private val context: Context) {
                 Log.d(TAG, "✅ Force stop command executed")
 
                 // Wait a bit before restarting
-                Thread.sleep(2000)
+                kotlinx.coroutines.delay(2000)
             } catch (e: Exception) {
                 Log.w(TAG, "⚠️ Force stop via shell failed: ${e.message}")
             }
@@ -200,7 +200,7 @@ class FandomatMonitor(private val context: Context) {
 
             if (restartSuccess) {
                 // Wait to verify restart
-                Thread.sleep(3000)
+                kotlinx.coroutines.delay(3000)
 
                 val isNowRunning = isAppInForeground(packageName)
                 if (isNowRunning) {
@@ -220,165 +220,156 @@ class FandomatMonitor(private val context: Context) {
     /**
      * Attempts to restart Fandomat application using multiple methods
      *
-     * Android 10+ (API 29+) restricts background activity launches for security.
-     * We use shell command as the primary method since it bypasses these restrictions.
+     * Priority order:
+     * 1. Accessibility Service (FULLY AUTOMATIC on Android 10+) - BEST METHOD
+     * 2. Shell command (works on some devices)
+     * 3. Direct startActivity (may work on older Android)
+     * 4. Notification (FALLBACK - requires user tap)
      */
     private suspend fun restartFandomat(packageName: String): Boolean {
         try {
+            Log.d(TAG, "==============================================")
             Log.d(TAG, "Attempting to restart $packageName...")
+            Log.d(TAG, "==============================================")
 
             // Log RESTARTING event first
             val restartingEvent = MonitorEvent(
                 eventType = EventType.FANDOMAT_RESTARTING,
-                message = "Attempting to restart Fandomat - sending notification to server"
+                message = "Attempting automatic restart of Fandomat"
             )
             eventRepository.insertEvent(restartingEvent)
-            Log.d(TAG, "📤 Event FANDOMAT_RESTARTING saved and will be sent to server")
+            Log.d(TAG, "📤 Event FANDOMAT_RESTARTING saved")
 
             // Give time for event to be synced
-            Thread.sleep(1000)
+            kotlinx.coroutines.delay(1000)
 
-            // Method 1: Try shell command (works on Android 10+)
-            // This bypasses background activity launch restrictions
+            // Method 1: PRIORITY - Use Accessibility Service (FULLY AUTOMATIC on Android 10+)
+            // This is the BEST method - launches apps from background without user interaction
+            if (AppLauncherAccessibilityService.isEnabled(context)) {
+                Log.d(TAG, "")
+                Log.d(TAG, "🤖🤖🤖 PRIORITY METHOD: Trying Accessibility Service...")
+                Log.d(TAG, "🤖 This will restart the app AUTOMATICALLY without user interaction!")
+                Log.d(TAG, "")
+
+                AppLauncherAccessibilityService.requestAppLaunch(context, packageName)
+
+                // Give service more time to launch the app
+                kotlinx.coroutines.delay(5000)
+
+                val isNowRunning = isAppInForeground(packageName)
+                if (isNowRunning) {
+                    val successEvent = MonitorEvent(
+                        eventType = EventType.FANDOMAT_RESTART_SUCCESS,
+                        message = "✅ Fandomat AUTO-restarted via Accessibility Service (no user interaction!)"
+                    )
+                    eventRepository.insertEvent(successEvent)
+                    Log.d(TAG, "")
+                    Log.d(TAG, "✅✅✅ SUCCESS! Fandomat AUTO-restarted - NO USER INTERACTION NEEDED!")
+                    Log.d(TAG, "==============================================")
+                    return true
+                } else {
+                    Log.w(TAG, "⚠️ Accessibility Service launch requested but app not running yet, trying backup methods...")
+                }
+            } else {
+                Log.w(TAG, "")
+                Log.w(TAG, "⚠️⚠️⚠️ ACCESSIBILITY SERVICE NOT ENABLED!")
+                Log.w(TAG, "⚠️⚠️⚠️ Automatic restart is DISABLED without it!")
+                Log.w(TAG, "⚠️ Enable it: Settings → Accessibility → Fandomon Auto Launcher")
+                Log.w(TAG, "⚠️ Without Accessibility Service, will try other methods and fallback to notification")
+                Log.w(TAG, "")
+            }
+
+            // Method 2: Try shell command (works on some devices)
             try {
                 val command = "am start -n $packageName/.MainActivity"
-                Log.d(TAG, "Executing shell command: $command")
+                Log.d(TAG, "Trying shell command: $command")
 
                 val process = Runtime.getRuntime().exec(command)
                 val exitCode = process.waitFor()
 
                 if (exitCode == 0) {
-                    Log.d(TAG, "✅ Shell command executed successfully")
+                    Log.d(TAG, "✅ Shell command executed")
 
                     // Wait to verify app actually started
-                    Thread.sleep(3000)
+                    kotlinx.coroutines.delay(3000)
 
                     val isNowRunning = isAppInForeground(packageName)
 
                     if (isNowRunning) {
-                        // Log SUCCESS event
                         val successEvent = MonitorEvent(
                             eventType = EventType.FANDOMAT_RESTART_SUCCESS,
-                            message = "Fandomat successfully restarted and now running"
+                            message = "Fandomat successfully restarted via shell command"
                         )
                         eventRepository.insertEvent(successEvent)
-                        Log.d(TAG, "✅ Fandomat is now running - SUCCESS event logged")
-                        return true
-                    } else {
-                        // Command executed but app not running
-                        val event = MonitorEvent(
-                            eventType = EventType.FANDOMAT_RESTARTED,
-                            message = "Restart command executed but app not detected in foreground (may need verification)"
-                        )
-                        eventRepository.insertEvent(event)
-                        Log.w(TAG, "⚠️ Command executed but app not detected in foreground")
+                        Log.d(TAG, "✅ Fandomat restarted via shell command")
+                        Log.d(TAG, "==============================================")
                         return true
                     }
                 } else {
-                    Log.w(TAG, "⚠️ Shell command failed with exit code: $exitCode, trying alternative method...")
+                    Log.w(TAG, "⚠️ Shell command failed with exit code: $exitCode")
                 }
             } catch (shellError: Exception) {
-                Log.w(TAG, "⚠️ Shell command error: ${shellError.message}, trying alternative method...")
+                Log.w(TAG, "⚠️ Shell command error: ${shellError.message}")
             }
 
-            // Method 2: Use Accessibility Service (FULLY AUTOMATIC on Android 10+)
-            // This service can launch apps from background without user interaction
-            if (AppLauncherAccessibilityService.isEnabled(context)) {
-                Log.d(TAG, "🤖 Trying Accessibility Service for AUTOMATIC restart...")
+            // Method 3: Try direct startActivity (may work on older Android versions)
+            try {
+                val intent = context.packageManager.getLaunchIntentForPackage(packageName)
+                if (intent != null) {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
 
-                AppLauncherAccessibilityService.requestAppLaunch(context, packageName)
+                    Log.d(TAG, "Trying direct startActivity...")
+                    context.startActivity(intent)
 
-                // Give service time to launch the app
-                Thread.sleep(3000)
+                    // Wait and check
+                    kotlinx.coroutines.delay(3000)
+                    val isNowRunning = isAppInForeground(packageName)
 
-                val isNowRunning = isAppInForeground(packageName)
-                if (isNowRunning) {
-                    val successEvent = MonitorEvent(
-                        eventType = EventType.FANDOMAT_RESTART_SUCCESS,
-                        message = "Fandomat AUTO-restarted via Accessibility Service (no user interaction!)"
-                    )
-                    eventRepository.insertEvent(successEvent)
-                    Log.d(TAG, "✅✅✅ Fandomat AUTO-restarted successfully - NO USER INTERACTION NEEDED!")
-                    return true
-                } else {
-                    val event = MonitorEvent(
-                        eventType = EventType.FANDOMAT_RESTARTED,
-                        message = "Accessibility Service launch requested - app should start automatically"
-                    )
-                    eventRepository.insertEvent(event)
-                    Log.d(TAG, "📱 Accessibility Service launch requested")
-                    return true
+                    if (isNowRunning) {
+                        val successEvent = MonitorEvent(
+                            eventType = EventType.FANDOMAT_RESTART_SUCCESS,
+                            message = "Fandomat successfully restarted via launch intent"
+                        )
+                        eventRepository.insertEvent(successEvent)
+                        Log.d(TAG, "✅ Fandomat restarted via launch intent")
+                        Log.d(TAG, "==============================================")
+                        return true
+                    } else {
+                        Log.w(TAG, "⚠️ startActivity() called but app not running (blocked by Android 10+)")
+                    }
                 }
-            } else {
-                Log.w(TAG, "⚠️ Accessibility Service NOT enabled - CANNOT auto-restart without user tap")
-                Log.w(TAG, "⚠️ Enable: Settings → Accessibility → Fandomon Auto Launcher")
+            } catch (e: Exception) {
+                Log.w(TAG, "⚠️ startActivity error: ${e.message}")
             }
 
-            // Method 3: Use high-priority notification with PendingIntent (requires user tap)
-            // This is a fallback if Accessibility Service is not enabled
-            Log.d(TAG, "Trying notification-based restart (REQUIRES USER TO TAP)...")
+            // Method 4: FALLBACK - Send notification (REQUIRES USER TO TAP)
+            Log.w(TAG, "")
+            Log.w(TAG, "⚠️⚠️⚠️ All automatic methods failed!")
+            Log.w(TAG, "⚠️⚠️⚠️ Falling back to NOTIFICATION - USER MUST TAP IT!")
+            Log.w(TAG, "")
+
             val notificationSuccess = sendRestartNotification(packageName)
 
             if (notificationSuccess) {
-                Log.d(TAG, "✅ Restart notification sent successfully")
-
-                // Wait for user to tap notification
-                Thread.sleep(2000)
-
-                val isNowRunning = isAppInForeground(packageName)
-                if (isNowRunning) {
-                    val successEvent = MonitorEvent(
-                        eventType = EventType.FANDOMAT_RESTART_SUCCESS,
-                        message = "Fandomat restarted via notification tap"
-                    )
-                    eventRepository.insertEvent(successEvent)
-                    Log.d(TAG, "✅ Fandomat restarted via notification tap")
-                    return true
-                } else {
-                    val event = MonitorEvent(
-                        eventType = EventType.FANDOMAT_RESTARTED,
-                        message = "Restart notification sent - WAITING FOR USER TO TAP"
-                    )
-                    eventRepository.insertEvent(event)
-                    Log.d(TAG, "📱 Notification sent, WAITING FOR USER TO TAP")
-                    return true
-                }
-            }
-
-            // Method 3: Final fallback to startActivity (may not work on Android 10+ from background)
-            val intent = context.packageManager.getLaunchIntentForPackage(packageName)
-            if (intent != null) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-
-                Log.d(TAG, "Launch intent found: $intent")
-                context.startActivity(intent)
-
-                // Wait and check
-                Thread.sleep(3000)
-                val isNowRunning = isAppInForeground(packageName)
-
-                if (isNowRunning) {
-                    val successEvent = MonitorEvent(
-                        eventType = EventType.FANDOMAT_RESTART_SUCCESS,
-                        message = "Fandomat successfully restarted via launch intent"
-                    )
-                    eventRepository.insertEvent(successEvent)
-                    Log.d(TAG, "✅ Fandomat restarted successfully via intent")
-                    return true
-                } else {
-                    // Log attempt but uncertain
-                    val event = MonitorEvent(
-                        eventType = EventType.FANDOMAT_RESTARTED,
-                        message = "Fandomat restart attempted via launch intent (may be blocked by Android 10+)"
-                    )
-                    eventRepository.insertEvent(event)
-                    Log.d(TAG, "⚠️ startActivity() called but app not confirmed running")
-                    return true
-                }
+                val event = MonitorEvent(
+                    eventType = EventType.FANDOMAT_RESTARTED,
+                    message = "⚠️ Automatic restart failed - Notification sent - USER MUST TAP to restart app"
+                )
+                eventRepository.insertEvent(event)
+                Log.w(TAG, "📱 Notification sent - WAITING FOR USER TO TAP")
+                Log.d(TAG, "==============================================")
+                return true  // We did what we could
             } else {
-                Log.e(TAG, "❌ Launch intent not found for $packageName")
+                Log.e(TAG, "❌ Failed to send notification!")
+                val event = MonitorEvent(
+                    eventType = EventType.FANDOMAT_STOPPED,
+                    message = "❌ All restart methods failed including notification - manual intervention required"
+                )
+                eventRepository.insertEvent(event)
+                Log.d(TAG, "==============================================")
+                return false
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error restarting Fandomat: ${e.message}", e)

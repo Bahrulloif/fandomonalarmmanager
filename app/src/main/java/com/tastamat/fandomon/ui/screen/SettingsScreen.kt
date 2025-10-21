@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tastamat.fandomon.ui.viewmodel.SettingsViewModel
+import com.tastamat.fandomon.utils.PermissionUtils
+import com.tastamat.fandomon.utils.XiaomiUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,9 +44,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         mqttPortText = state.mqttPort.toString()
     }
 
-    // Force LTR (Left-to-Right) layout direction
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        Scaffold(
+    // DON'T wrap entire Scaffold - apply LTR only to individual text fields to avoid conflicts
+    Scaffold(
             topBar = {
                 TopAppBar(
                     title = { Text("Fandomon Settings") },
@@ -63,6 +64,29 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Permissions quick status
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text("Permissions Status", style = MaterialTheme.typography.titleMedium)
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val usage = PermissionUtils.hasUsageStatsPermission(context)
+                    val notif = PermissionUtils.areNotificationsEnabled(context)
+                    val exact = PermissionUtils.canScheduleExactAlarms(context)
+                    val isXiaomi = XiaomiUtils.isXiaomiDevice()
+                    Text("Usage Access: ${if (usage) "OK" else "MISSING"}")
+                    Text("Notifications: ${if (notif) "OK" else "MISSING"}")
+                    Text("Exact Alarms: ${if (exact) "OK" else "CHECK"}")
+                    if (isXiaomi) {
+                        Text("Device: Xiaomi/MIUI (Autostart & Battery settings required)")
+                    }
+                }
+            }
+            
             // Monitoring Controls
             Card(
                 modifier = Modifier.fillMaxWidth()
@@ -443,6 +467,5 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 }
             }
         }
-    }
     }
 }

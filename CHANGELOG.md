@@ -2,6 +2,53 @@
 
 ## [Unreleased]
 
+## [2.3.3] - 2025-10-21 - Critical Fixes: Text Direction & Accessibility Service Priority
+
+### 🐛 Bug Fixes
+
+**FIXED:** Text cursor moving left instead of right when typing in ALL input fields
+- Removed conflicting outer `CompositionLocalProvider` that wrapped entire Scaffold
+- Kept individual LTR protection for each text field with constant `ltrTextStyle`
+- This was a regression - outer provider was causing conflicts with inner providers
+
+**FIXED:** Notification shown instead of automatic app restart
+- Changed priority order: Accessibility Service is now PRIMARY method
+- Increased delay after Accessibility Service launch from 3s to 5s for better reliability
+- Added detailed logging to show which restart method succeeded
+- Notification is now ONLY used as last fallback when all automatic methods fail
+
+### 📝 Technical Changes
+
+#### Modified Files
+- **SettingsScreen.kt**
+  - Removed outer `CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr)`
+  - Each `OutlinedTextField` still wrapped individually with `CompositionLocalProvider`
+  - This prevents conflicts while maintaining LTR text direction
+
+- **FandomatMonitor.kt** - `restartFandomat()`
+  - **NEW Priority Order:**
+    1. ✅ Accessibility Service (PRIORITY - fully automatic)
+    2. Shell command (backup method)
+    3. Direct startActivity (older Android)
+    4. Notification (FALLBACK - requires user tap)
+  - Increased Accessibility Service wait time: 3000ms → 5000ms
+  - Enhanced logging with clear markers showing which method succeeded
+  - Clear warnings when Accessibility Service is not enabled
+  - Notification only sent when ALL automatic methods fail
+
+### ⚙️ Important Notes
+
+**For Automatic Restart to Work:**
+1. Enable Accessibility Service: `Settings → Accessibility → Fandomon Auto Launcher`
+2. Without Accessibility Service, you will get notifications requiring user tap
+3. Check logs to see detailed restart attempt information
+
+**Build Info:**
+- Version Code: 12 → 13
+- Version Name: 2.3.2 → 2.3.3
+
+---
+
 ## [2.1.4] - 2025-10-20 - Bug Fix: Number Fields Input
 
 ### 🐛 Bug Fix
