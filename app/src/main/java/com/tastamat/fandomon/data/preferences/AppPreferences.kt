@@ -33,6 +33,7 @@ class AppPreferences(private val context: Context) {
         val FANDOMAT_PACKAGE_NAME = stringPreferencesKey("fandomat_package_name")
         val AUTO_RESTART_ENABLED = booleanPreferencesKey("auto_restart_enabled")
         val MONITORING_ACTIVE = booleanPreferencesKey("monitoring_active")
+        val AUTOSTART_DIALOG_SHOWN = booleanPreferencesKey("autostart_dialog_shown")
     }
 
     val deviceId: Flow<String> = context.dataStore.data.map { it[DEVICE_ID] ?: "" }
@@ -56,6 +57,7 @@ class AppPreferences(private val context: Context) {
     val fandomatPackageName: Flow<String> = context.dataStore.data.map { it[FANDOMAT_PACKAGE_NAME] ?: "com.tastamat.fandomat" }
     val autoRestartEnabled: Flow<Boolean> = context.dataStore.data.map { it[AUTO_RESTART_ENABLED] ?: true }
     val monitoringActive: Flow<Boolean> = context.dataStore.data.map { it[MONITORING_ACTIVE] ?: false }
+    val autostartDialogShown: Flow<Boolean> = context.dataStore.data.map { it[AUTOSTART_DIALOG_SHOWN] ?: false }
 
     suspend fun setDeviceId(deviceId: String) {
         context.dataStore.edit { it[DEVICE_ID] = deviceId }
@@ -127,5 +129,9 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setMonitoringActive(active: Boolean) {
         context.dataStore.edit { it[MONITORING_ACTIVE] = active }
+    }
+
+    suspend fun setAutostartDialogShown(shown: Boolean) {
+        context.dataStore.edit { it[AUTOSTART_DIALOG_SHOWN] = shown }
     }
 }
