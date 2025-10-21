@@ -1,10 +1,16 @@
 package com.tastamat.fandomon.service
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import com.tastamat.fandomon.R
 import com.tastamat.fandomon.data.local.FandomonDatabase
 import com.tastamat.fandomon.data.model.EventType
 import com.tastamat.fandomon.data.model.MonitorEvent
@@ -17,6 +23,32 @@ class FandomatMonitor(private val context: Context) {
     private val TAG = "FandomatMonitor"
     private val eventRepository = EventRepository(FandomonDatabase.getDatabase(context).eventDao())
     private val preferences = AppPreferences(context)
+
+    companion object {
+        private const val RESTART_NOTIFICATION_CHANNEL_ID = "fandomon_restart_channel"
+        private const val RESTART_NOTIFICATION_ID = 9999
+    }
+
+    init {
+        createNotificationChannel()
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "App Restart Notifications"
+            val descriptionText = "Critical notifications for restarting monitored applications"
+            val importance = NotificationManager.IMPORTANCE_HIGH
+            val channel = NotificationChannel(RESTART_NOTIFICATION_CHANNEL_ID, name, importance).apply {
+                description = descriptionText
+                setShowBadge(true)
+                enableVibration(true)
+            }
+
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+            Log.d(TAG, "✅ Restart notification channel created")
+        }
+    }
 
     /**
      * Check if Fandomat is running in foreground.
@@ -249,7 +281,38 @@ class FandomatMonitor(private val context: Context) {
                 Log.w(TAG, "⚠️ Shell command error: ${shellError.message}, trying alternative method...")
             }
 
-            // Method 2: Fallback to startActivity (may not work on Android 10+ from background)
+            // Method 2: Use high-priority notification with PendingIntent (works on Android 10+)
+            // This is allowed because notifications can start activities even from background
+            Log.d(TAG, "Trying notification-based restart for Android 10+...")
+            val notificationSuccess = sendRestartNotification(packageName)
+
+            if (notificationSuccess) {
+                Log.d(TAG, "✅ Restart notification sent successfully")
+
+                // Wait for user to tap notification or auto-launch
+                Thread.sleep(2000)
+
+                val isNowRunning = isAppInForeground(packageName)
+                if (isNowRunning) {
+                    val successEvent = MonitorEvent(
+                        eventType = EventType.FANDOMAT_RESTART_SUCCESS,
+                        message = "Fandomat successfully restarted via notification"
+                    )
+                    eventRepository.insertEvent(successEvent)
+                    Log.d(TAG, "✅ Fandomat restarted successfully via notification")
+                    return true
+                } else {
+                    val event = MonitorEvent(
+                        eventType = EventType.FANDOMAT_RESTARTED,
+                        message = "Restart notification sent - waiting for app to start"
+                    )
+                    eventRepository.insertEvent(event)
+                    Log.d(TAG, "📱 Notification sent, app should start when tapped")
+                    return true
+                }
+            }
+
+            // Method 3: Final fallback to startActivity (may not work on Android 10+ from background)
             val intent = context.packageManager.getLaunchIntentForPackage(packageName)
             if (intent != null) {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -296,6 +359,69 @@ class FandomatMonitor(private val context: Context) {
         }
 
         return false
+    }
+
+    /**
+     * Send high-priority notification to restart the app
+     * On Android 10+, notifications can trigger PendingIntents to start activities
+     */
+    private fun sendRestartNotification(packageName: String): Boolean {
+        try {
+            val intent = context.packageManager.getLaunchIntentForPackage(packageName)
+            if (intent == null) {
+                Log.e(TAG, "❌ Cannot create notification: launch intent not found for $packageName")
+                return false
+            }
+
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+
+            val pendingIntentFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                pendingIntentFlags
+            )
+
+            // Get app name
+            val pm = context.packageManager
+            val appInfo = pm.getApplicationInfo(packageName, 0)
+            val appName = pm.getApplicationLabel(appInfo).toString()
+
+            val notification = NotificationCompat.Builder(context, RESTART_NOTIFICATION_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setContentTitle("$appName stopped")
+                .setContentText("Tap to restart $appName")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setFullScreenIntent(pendingIntent, true) // This allows launching even when locked
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .build()
+
+            val notificationManager = NotificationManagerCompat.from(context)
+
+            try {
+                notificationManager.notify(RESTART_NOTIFICATION_ID, notification)
+                Log.d(TAG, "✅ High-priority restart notification sent for $appName")
+                return true
+            } catch (e: SecurityException) {
+                Log.e(TAG, "❌ Notification permission denied: ${e.message}")
+                return false
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sending restart notification: ${e.message}", e)
+            return false
+        }
     }
 
     private fun isAppInForeground(packageName: String): Boolean {
