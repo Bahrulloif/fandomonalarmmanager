@@ -24,18 +24,30 @@ class CommandHandler(private val context: Context) {
 
     /**
      * Parse incoming MQTT command message
+     *
+     * Supports BOTH formats:
+     * - Old format: {"command":"RESTART_FANDOMAT","timestamp":1729500000000}
+     * - New format: {"command":"restart_fandomat"}
      */
     fun parseCommand(jsonString: String): RemoteCommand? {
         return try {
             val json = JSONObject(jsonString)
             val commandStr = json.optString("command", "")
             val commandType = when (commandStr.uppercase()) {
+                // Old format commands (uppercase with underscores)
                 "RESTART_FANDOMAT" -> CommandType.RESTART_FANDOMAT
                 "RESTART_FANDOMON" -> CommandType.RESTART_FANDOMON
                 "UPDATE_SETTINGS" -> CommandType.UPDATE_SETTINGS
                 "CLEAR_EVENTS" -> CommandType.CLEAR_EVENTS
                 "FORCE_SYNC" -> CommandType.FORCE_SYNC
                 "GET_STATUS" -> CommandType.GET_STATUS
+
+                // New format commands (lowercase with underscores) - map to existing commands
+                "START_MONITORING" -> CommandType.START_MONITORING
+                "STOP_MONITORING" -> CommandType.STOP_MONITORING
+                "SEND_STATUS" -> CommandType.SEND_STATUS  // Alias for GET_STATUS
+                "SYNC_EVENTS" -> CommandType.SYNC_EVENTS  // Alias for FORCE_SYNC
+
                 else -> CommandType.UNKNOWN
             }
 
@@ -66,12 +78,19 @@ class CommandHandler(private val context: Context) {
         Log.d(TAG, "🎯 Executing command: ${command.command}")
 
         when (command.command) {
-            CommandType.RESTART_FANDOMAT -> restartFandomat(command.parameters)
+            CommandType.RESTART_FANDOMAT -> restartFandomat()
             CommandType.RESTART_FANDOMON -> restartFandomon()
             CommandType.UPDATE_SETTINGS -> updateSettings(command.parameters)
             CommandType.CLEAR_EVENTS -> clearEvents()
             CommandType.FORCE_SYNC -> forceSync()
             CommandType.GET_STATUS -> sendImmediateStatus()
+
+            // New format commands
+            CommandType.START_MONITORING -> startMonitoring()
+            CommandType.STOP_MONITORING -> stopMonitoring()
+            CommandType.SEND_STATUS -> sendImmediateStatus()  // Alias for GET_STATUS
+            CommandType.SYNC_EVENTS -> forceSync()  // Alias for FORCE_SYNC
+
             CommandType.UNKNOWN -> {
                 Log.w(TAG, "⚠️ Unknown command received")
                 CoroutineScope(Dispatchers.IO).launch {
@@ -81,7 +100,7 @@ class CommandHandler(private val context: Context) {
         }
     }
 
-    private fun restartFandomat(parameters: Map<String, String>) {
+    private fun restartFandomat() {
         Log.d(TAG, "🔄 Executing RESTART_FANDOMAT command")
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -125,7 +144,7 @@ class CommandHandler(private val context: Context) {
                 intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
 
                 // Small delay to ensure event is logged
-                Thread.sleep(500)
+                kotlinx.coroutines.delay(500)
 
                 if (intent != null) {
                     context.startActivity(intent)
@@ -243,6 +262,62 @@ class CommandHandler(private val context: Context) {
             Log.d(TAG, "✅ GET_STATUS command executed successfully")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error executing GET_STATUS: ${e.message}", e)
+        }
+    }
+
+    private fun startMonitoring() {
+        Log.d(TAG, "▶️ Executing START_MONITORING command")
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Set monitoring active flag
+                preferences.setMonitoringActive(true)
+
+                // Get current intervals
+                val checkInterval = preferences.checkIntervalMinutes.first()
+                val statusInterval = preferences.statusReportIntervalMinutes.first()
+
+                // Schedule monitoring alarms
+                val scheduler = AlarmScheduler(context)
+                scheduler.scheduleMonitoring(checkInterval, statusInterval)
+
+                logCommandEvent(
+                    "COMMAND_START_MONITORING",
+                    "Monitoring started via remote command (check: ${checkInterval}min, status: ${statusInterval}min)"
+                )
+                Log.d(TAG, "✅ START_MONITORING command executed successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error executing START_MONITORING: ${e.message}", e)
+                logCommandEvent(
+                    "COMMAND_START_MONITORING_FAILED",
+                    "Failed to start monitoring: ${e.message}"
+                )
+            }
+        }
+    }
+
+    private fun stopMonitoring() {
+        Log.d(TAG, "⏹️ Executing STOP_MONITORING command")
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Set monitoring inactive flag
+                preferences.setMonitoringActive(false)
+
+                // Cancel all monitoring alarms
+                val scheduler = AlarmScheduler(context)
+                scheduler.cancelAllAlarms()
+
+                logCommandEvent(
+                    "COMMAND_STOP_MONITORING",
+                    "Monitoring stopped via remote command"
+                )
+                Log.d(TAG, "✅ STOP_MONITORING command executed successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error executing STOP_MONITORING: ${e.message}", e)
+                logCommandEvent(
+                    "COMMAND_STOP_MONITORING_FAILED",
+                    "Failed to stop monitoring: ${e.message}"
+                )
+            }
         }
     }
 

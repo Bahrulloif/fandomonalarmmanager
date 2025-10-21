@@ -2,6 +2,110 @@
 
 ## [Unreleased]
 
+## [2.3.5] - 2025-10-21 - Full Backward Compatibility with Existing Commands
+
+### 🔄 Backward Compatibility Enhancement
+
+**ADDED:** Full support for existing broker.hivemq.com command format
+
+Your existing commands continue to work with **ZERO changes required**!
+
+#### Both Formats Supported
+
+**Old Format (Your current setup):**
+```json
+{"command":"RESTART_FANDOMAT","timestamp":1729500000000}
+```
+
+**New Format (Also works):**
+```json
+{"command":"restart_fandomat"}
+```
+
+Both formats work identically - the parser is case-insensitive and accepts both uppercase and lowercase commands.
+
+#### Supported Command Mappings
+
+| Old Format | New Format | Action |
+|------------|------------|--------|
+| `RESTART_FANDOMAT` | `restart_fandomat` | Restart Fandomat app |
+| `GET_STATUS` | `send_status` | Send status report |
+| `FORCE_SYNC` | `sync_events` | Sync events |
+| N/A | `start_monitoring` | Start monitoring (NEW) |
+| N/A | `stop_monitoring` | Stop monitoring (NEW) |
+
+#### Key Features
+
+- ✅ **Zero migration required** - existing scripts work as-is
+- ✅ **Case-insensitive** - UPPERCASE, lowercase, or Mixed all work
+- ✅ **Timestamp optional** - can be included or omitted
+- ✅ **Works with targeted commands** - both formats support device-specific topics
+- ✅ **New commands added** - `start_monitoring` and `stop_monitoring`
+
+### 📝 Technical Changes
+
+#### Modified Files
+- **CommandType.kt**
+  - Added `START_MONITORING`, `STOP_MONITORING`, `SEND_STATUS`, `SYNC_EVENTS`
+  - `SEND_STATUS` is alias for `GET_STATUS`
+  - `SYNC_EVENTS` is alias for `FORCE_SYNC`
+
+- **CommandHandler.kt**
+  - Enhanced parser to accept both uppercase and lowercase
+  - Added `startMonitoring()` method - schedules monitoring alarms
+  - Added `stopMonitoring()` method - cancels monitoring alarms
+  - Removed unused `parameters` parameter from `restartFandomat()`
+  - All commands are converted to uppercase internally for matching
+
+- **EventType.kt**
+  - Added `COMMAND_START_MONITORING`, `COMMAND_START_MONITORING_FAILED`
+  - Added `COMMAND_STOP_MONITORING`, `COMMAND_STOP_MONITORING_FAILED`
+
+#### New Documentation
+- **COMMAND_FORMATS.md**
+  - Complete guide for both command formats
+  - Migration guide (spoiler: no migration needed!)
+  - Python examples for both formats
+  - Testing instructions
+
+### 💡 Usage Examples
+
+**Your existing commands (still work):**
+```bash
+# Restart Fandomat - OLD FORMAT
+mosquitto_pub -t "fandomon/commands" \
+  -m '{"command":"RESTART_FANDOMAT","timestamp":1729500000000}'
+
+# Get status - OLD FORMAT
+mosquitto_pub -t "fandomon/commands" \
+  -m '{"command":"GET_STATUS","timestamp":1729500000000}'
+```
+
+**New simpler format (also works):**
+```bash
+# Restart Fandomat - NEW FORMAT
+mosquitto_pub -t "fandomon/commands" \
+  -m '{"command":"restart_fandomat"}'
+
+# Start monitoring - NEW COMMAND
+mosquitto_pub -t "fandomon/sklad-a/commands" \
+  -m '{"command":"start_monitoring"}'
+```
+
+### 🔄 Migration Status
+
+**No Migration Required!**
+- Your existing Python/Node.js scripts work without changes
+- Timestamp field remains supported (optional)
+- Uppercase commands continue to work
+- Can gradually adopt new format if desired
+
+**Build Info:**
+- Version Code: 14 → 15
+- Version Name: 2.3.4 → 2.3.5
+
+---
+
 ## [2.3.4] - 2025-10-21 - Device-Specific MQTT Commands (Targeted Commands)
 
 ### ✨ New Feature: Targeted MQTT Commands

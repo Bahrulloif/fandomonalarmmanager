@@ -7,6 +7,10 @@ enum class CommandType {
     CLEAR_EVENTS,          // Clear local event database
     FORCE_SYNC,            // Force immediate event sync
     GET_STATUS,            // Request immediate status report
+    START_MONITORING,      // Start monitoring (new format)
+    STOP_MONITORING,       // Stop monitoring (new format)
+    SEND_STATUS,           // Alias for GET_STATUS (new format)
+    SYNC_EVENTS,           // Alias for FORCE_SYNC (new format)
     UNKNOWN                // Unknown command
 }
 
