@@ -139,7 +139,7 @@ fun OnboardingScreen(
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("File Access for Freeze Detection", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Needed to read Fandomat's heartbeat log (messages.log) to detect if app is frozen. " +
+                        "Needed to read Fandomat's heartbeat log (logfile.txt) to detect if app is frozen. " +
                         "This is how Fandomon knows when Fandomat crashes or stops responding.",
                         style = MaterialTheme.typography.bodyMedium
                     )

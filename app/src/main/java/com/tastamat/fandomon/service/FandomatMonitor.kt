@@ -137,7 +137,7 @@ class FandomatMonitor(private val context: Context) {
 
     /**
      * Check if app is responding (not frozen)
-     * Uses Fandomat's heartbeat mechanism via messages.log file
+     * Uses Fandomat's heartbeat mechanism via logfile.txt file
      *
      * Fandomat writes log entries every N seconds (configured by user).
      * If no new log entry for more than 3 minutes → app is frozen/crashed
@@ -148,7 +148,7 @@ class FandomatMonitor(private val context: Context) {
 
             // Path to Fandomat's heartbeat log file
             val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val logFile = File(downloadDir, "messages.log")
+            val logFile = File(downloadDir, "logfile.txt")
 
             if (!logFile.exists()) {
                 Log.w(TAG, "⚠️ Heartbeat log file not found: ${logFile.absolutePath}")
