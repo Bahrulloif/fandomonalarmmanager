@@ -2,6 +2,85 @@
 
 ## [Unreleased]
 
+## [2.3.4] - 2025-10-21 - Device-Specific MQTT Commands (Targeted Commands)
+
+### ✨ New Feature: Targeted MQTT Commands
+
+**ADDED:** Device-specific MQTT command topics for managing multiple devices individually
+
+When you have multiple Fandomon installations (e.g., multiple tablets), you can now send commands to specific devices instead of broadcasting to all devices.
+
+#### How It Works
+
+Each device now subscribes to **TWO topics**:
+1. **Broadcast topic**: `fandomon/commands` (all devices receive)
+2. **Device-specific topic**: `fandomon/{device_id}/commands` (only one device receives)
+
+#### Example Usage
+
+**Send command to ALL devices:**
+```bash
+mosquitto_pub -t "fandomon/commands" -m '{"command":"restart_fandomat"}'
+```
+
+**Send command to SPECIFIC device:**
+```bash
+mosquitto_pub -t "fandomon/warehouse-a/commands" -m '{"command":"restart_fandomat"}'
+```
+
+Only the device with `device_id = "warehouse-a"` will execute this command.
+
+#### Use Cases
+
+- **Multiple tablets in different locations**: Send commands to specific warehouse/office
+- **Individual device management**: Restart only problematic devices
+- **Targeted status requests**: Get status from specific device
+- **Different commands for different devices**: Start monitoring on some, stop on others
+
+### 📝 Technical Changes
+
+#### Modified Files
+- **DataSyncService.kt** - `subscribeToCommands()`
+  - Now subscribes to TWO topics: broadcast + device-specific
+  - Device-specific topic format: `fandomon/{device_id}/commands`
+  - Enhanced logging to show BROADCAST vs TARGETED commands
+  - `handleIncomingCommand()` now accepts `isBroadcast` parameter
+
+#### New Documentation
+- **TARGETED_COMMANDS.md**
+  - Complete guide for using targeted commands
+  - Python and Node.js examples
+  - Best practices for device naming
+  - Troubleshooting guide
+
+### ⚙️ Configuration
+
+**Set Device ID in Fandomon Settings:**
+- Open Fandomon → Settings → Device Settings
+- Set **Device ID**: e.g., `warehouse-a`, `tablet-01`, `office-main`
+- Each device MUST have a unique ID
+
+**Verify in Logs:**
+```
+📡 MQTT Command Subscription Summary:
+  • Broadcast topic: fandomon/commands (for ALL devices)
+  • Device-specific topic: fandomon/warehouse-a/commands (for THIS device only)
+  • Device ID: warehouse-a
+```
+
+### 🔄 Backward Compatibility
+
+✅ **Fully backward compatible**
+- Broadcast commands (`fandomon/commands`) still work on all versions
+- Devices without unique Device ID will still respond to broadcast
+- No breaking changes to existing setups
+
+**Build Info:**
+- Version Code: 13 → 14
+- Version Name: 2.3.3 → 2.3.4
+
+---
+
 ## [2.3.3] - 2025-10-21 - Critical Fixes: Text Direction & Accessibility Service Priority
 
 ### 🐛 Bug Fixes

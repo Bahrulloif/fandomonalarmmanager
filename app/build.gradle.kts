@@ -13,8 +13,8 @@ android {
         applicationId = "com.tastamat.fandomon"
         minSdk = 30
         targetSdk = 36
-        versionCode = 13
-        versionName = "2.3.3"
+        versionCode = 14
+        versionName = "2.3.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

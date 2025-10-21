@@ -122,8 +122,8 @@ class DataSyncService(private val context: Context) {
                     onSuccess = { connected = true },
                     onFailure = { connected = false }
                 )
-                // Wait for connection (simplified, consider using suspendCoroutine)
-                Thread.sleep(2000)
+                // Wait for connection with proper coroutine delay
+                kotlinx.coroutines.delay(2000)
                 if (!connected) return false
             }
 
@@ -143,7 +143,7 @@ class DataSyncService(private val context: Context) {
                 onFailure = { publishSuccess = false }
             )
 
-            Thread.sleep(1000) // Wait for publish
+            kotlinx.coroutines.delay(1000) // Wait for publish
             publishSuccess
         } catch (e: Exception) {
             Log.e(TAG, "Error sending via MQTT", e)
@@ -210,7 +210,11 @@ class DataSyncService(private val context: Context) {
     }
 
     /**
-     * Subscribe to MQTT commands topic for remote control
+     * Subscribe to MQTT commands topics for remote control
+     *
+     * Subscribes to TWO topics:
+     * 1. Broadcast topic (general commands for all devices): fandomon/commands
+     * 2. Device-specific topic (targeted commands): fandomon/{device_id}/commands
      */
     suspend fun subscribeToCommands() {
         try {
@@ -247,41 +251,70 @@ class DataSyncService(private val context: Context) {
                         Log.e(TAG, "❌ Failed to connect to MQTT broker")
                     }
                 )
-                Thread.sleep(2000) // Wait for connection
+                kotlinx.coroutines.delay(2000) // Wait for connection
                 if (!connected) return
             }
 
-            // Subscribe to commands topic
-            val commandsTopic = preferences.mqttTopicCommands.first()
+            val deviceId = getDeviceId()
+
+            // Subscribe to BROADCAST commands topic (all devices)
+            val broadcastTopic = preferences.mqttTopicCommands.first()
             mqttClient.subscribe(
-                topic = commandsTopic,
+                topic = broadcastTopic,
                 qos = 1,
                 onMessageReceived = { topic, message ->
-                    Log.d(TAG, "📥 Command received on [$topic]: $message")
-                    handleIncomingCommand(message)
+                    Log.d(TAG, "📥 BROADCAST command received on [$topic]: $message")
+                    handleIncomingCommand(message, isBroadcast = true)
                 },
                 onSuccess = {
-                    Log.d(TAG, "✅ Subscribed to commands topic: $commandsTopic")
+                    Log.d(TAG, "✅ Subscribed to BROADCAST commands: $broadcastTopic")
                 },
                 onFailure = { error ->
-                    Log.e(TAG, "❌ Failed to subscribe to commands: ${error.message}")
+                    Log.e(TAG, "❌ Failed to subscribe to broadcast commands: ${error.message}")
                 }
             )
+
+            // Subscribe to DEVICE-SPECIFIC commands topic
+            val deviceSpecificTopic = "fandomon/$deviceId/commands"
+            mqttClient.subscribe(
+                topic = deviceSpecificTopic,
+                qos = 1,
+                onMessageReceived = { topic, message ->
+                    Log.d(TAG, "📥 TARGETED command received on [$topic]: $message")
+                    handleIncomingCommand(message, isBroadcast = false)
+                },
+                onSuccess = {
+                    Log.d(TAG, "✅ Subscribed to DEVICE-SPECIFIC commands: $deviceSpecificTopic")
+                    Log.d(TAG, "📌 This device will respond to commands sent to: $deviceSpecificTopic")
+                },
+                onFailure = { error ->
+                    Log.e(TAG, "❌ Failed to subscribe to device-specific commands: ${error.message}")
+                }
+            )
+
+            Log.d(TAG, "")
+            Log.d(TAG, "📡 MQTT Command Subscription Summary:")
+            Log.d(TAG, "  • Broadcast topic: $broadcastTopic (for ALL devices)")
+            Log.d(TAG, "  • Device-specific topic: $deviceSpecificTopic (for THIS device only)")
+            Log.d(TAG, "  • Device ID: $deviceId")
+            Log.d(TAG, "")
         } catch (e: Exception) {
             Log.e(TAG, "Error subscribing to commands", e)
         }
     }
 
-    private fun handleIncomingCommand(message: String) {
+    private fun handleIncomingCommand(message: String, isBroadcast: Boolean) {
         try {
-            Log.d(TAG, "🔍 Parsing command: $message")
+            val commandSource = if (isBroadcast) "BROADCAST" else "TARGETED"
+            Log.d(TAG, "🔍 Parsing $commandSource command: $message")
+
             val command = commandHandler.parseCommand(message)
 
             if (command != null) {
-                Log.d(TAG, "✅ Command parsed successfully: ${command.command}")
+                Log.d(TAG, "✅ Command parsed successfully: ${command.command} (source: $commandSource)")
                 commandHandler.executeCommand(command)
             } else {
-                Log.w(TAG, "⚠️ Failed to parse command")
+                Log.w(TAG, "⚠️ Failed to parse $commandSource command")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error handling command: ${e.message}", e)
