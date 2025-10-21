@@ -69,8 +69,10 @@ class FandomatMonitor(private val context: Context) {
         Log.d(TAG, "Target package: $packageName")
         Log.d(TAG, "Auto-restart: ${if (autoRestartEnabled) "ENABLED ✅" else "DISABLED ❌"}")
 
+        val checkIntervalMinutes = preferences.checkIntervalMinutes.first()
+
         val isRunning = isAppInForeground(packageName)
-        val isResponding = if (isRunning) checkIfAppResponding(packageName) else false
+        val isResponding = if (isRunning) checkIfAppResponding(packageName, checkIntervalMinutes) else false
 
         Log.d(TAG, "Fandomat ($packageName) running in foreground: $isRunning")
         if (isRunning) {
@@ -140,9 +142,9 @@ class FandomatMonitor(private val context: Context) {
      * Uses Fandomat's heartbeat mechanism via logfile.txt file
      *
      * Fandomat writes log entries every N seconds (configured by user).
-     * If no new log entry for more than 3 minutes → app is frozen/crashed
+     * If no new log entry for more than checkIntervalMinutes → app is frozen/crashed
      */
-    private fun checkIfAppResponding(packageName: String): Boolean {
+    private fun checkIfAppResponding(packageName: String, checkIntervalMinutes: Int): Boolean {
         try {
             Log.d(TAG, "📊 Checking heartbeat for $packageName...")
 
@@ -184,17 +186,18 @@ class FandomatMonitor(private val context: Context) {
             // Calculate time since last heartbeat
             val currentTime = System.currentTimeMillis()
             val timeSinceHeartbeat = currentTime - lastHeartbeat.time
-            val threeMinutes = 3 * 60 * 1000L
+            val freezeTimeoutMs = checkIntervalMinutes * 60 * 1000L
 
             val minutesAgo = timeSinceHeartbeat / 60000
             Log.d(TAG, "📊 Last heartbeat: $timestampStr (${minutesAgo} minutes ago)")
+            Log.d(TAG, "📊 Freeze timeout: $checkIntervalMinutes minutes")
 
-            if (timeSinceHeartbeat > threeMinutes) {
-                Log.w(TAG, "⚠️ No heartbeat for $minutesAgo minutes - Fandomat might be FROZEN!")
+            if (timeSinceHeartbeat > freezeTimeoutMs) {
+                Log.w(TAG, "⚠️ No heartbeat for $minutesAgo minutes (timeout: $checkIntervalMinutes min) - Fandomat might be FROZEN!")
                 return false
             }
 
-            Log.d(TAG, "✅ Heartbeat OK - last update ${minutesAgo} minutes ago")
+            Log.d(TAG, "✅ Heartbeat OK - last update ${minutesAgo} minutes ago (timeout: $checkIntervalMinutes min)")
             return true
 
         } catch (e: Exception) {
