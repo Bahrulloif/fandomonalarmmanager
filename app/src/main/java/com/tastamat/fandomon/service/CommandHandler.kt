@@ -101,21 +101,59 @@ class CommandHandler(private val context: Context) {
     }
 
     private fun restartFandomat() {
-        Log.d(TAG, "🔄 Executing RESTART_FANDOMAT command")
+        Log.d(TAG, "🔄 Executing RESTART_FANDOMAT command - FORCE RESTART")
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val packageName = preferences.fandomatPackageName.first()
 
-                // Method 1: Try ADB shell command
-                val command = "am start -n $packageName/.MainActivity"
-                Log.d(TAG, "Executing shell command: $command")
-                Runtime.getRuntime().exec(command)
-
                 logCommandEvent(
                     "COMMAND_RESTART_FANDOMAT",
-                    "Remote restart command executed for $packageName"
+                    "Remote FORCE RESTART command received for $packageName"
                 )
-                Log.d(TAG, "✅ RESTART_FANDOMAT command executed successfully")
+
+                // Step 1: FORCE STOP the app first (kills it completely)
+                Log.d(TAG, "⏹️ Step 1: Force stopping $packageName...")
+                try {
+                    val stopCommand = "am force-stop $packageName"
+                    val stopProcess = Runtime.getRuntime().exec(stopCommand)
+                    stopProcess.waitFor()
+                    Log.d(TAG, "✅ Force stop completed")
+                } catch (e: Exception) {
+                    Log.w(TAG, "⚠️ Force stop failed: ${e.message}")
+                }
+
+                // Wait for app to fully stop
+                kotlinx.coroutines.delay(2000)
+
+                // Step 2: START the app (now it's a real restart)
+                Log.d(TAG, "🚀 Step 2: Starting $packageName...")
+                try {
+                    // Try multiple methods in priority order
+
+                    // Method 1: Accessibility Service (BEST - works on Android 10+)
+                    if (AppLauncherAccessibilityService.isEnabled(context)) {
+                        Log.d(TAG, "🤖 Using Accessibility Service to launch app")
+                        AppLauncherAccessibilityService.requestAppLaunch(context, packageName)
+                        kotlinx.coroutines.delay(3000)
+                        Log.d(TAG, "✅ Accessibility Service launch requested")
+                    } else {
+                        Log.w(TAG, "⚠️ Accessibility Service not enabled, using shell command")
+
+                        // Method 2: Shell command (may not work on Android 10+)
+                        val startCommand = "am start -n $packageName/.MainActivity"
+                        Log.d(TAG, "Executing: $startCommand")
+                        Runtime.getRuntime().exec(startCommand)
+                        kotlinx.coroutines.delay(2000)
+                    }
+
+                    Log.d(TAG, "✅ RESTART_FANDOMAT command executed - app should be restarting")
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Error starting app: ${e.message}", e)
+                    logCommandEvent(
+                        "COMMAND_RESTART_FANDOMAT_FAILED",
+                        "Failed to start Fandomat after force stop: ${e.message}"
+                    )
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Error executing RESTART_FANDOMAT: ${e.message}", e)
                 logCommandEvent(
