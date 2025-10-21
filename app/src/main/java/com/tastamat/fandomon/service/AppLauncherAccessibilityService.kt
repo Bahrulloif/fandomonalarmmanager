@@ -1,8 +1,12 @@
 package com.tastamat.fandomon.service
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 
@@ -14,10 +18,16 @@ import android.view.accessibility.AccessibilityEvent
  */
 class AppLauncherAccessibilityService : AccessibilityService() {
 
+    private var handler: Handler? = null
+    private var checkRunnable: Runnable? = null
+    private var launchReceiver: BroadcastReceiver? = null
+
     companion object {
         private const val TAG = "AppLauncherService"
         private const val PREFS_NAME = "app_launcher_prefs"
         private const val KEY_PENDING_LAUNCH = "pending_launch_package"
+        private const val ACTION_LAUNCH_APP = "com.tastamat.fandomon.LAUNCH_APP"
+        private const val CHECK_INTERVAL_MS = 2000L // Check every 2 seconds
 
         /**
          * Request to launch an app automatically
@@ -27,6 +37,12 @@ class AppLauncherAccessibilityService : AccessibilityService() {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit().putString(KEY_PENDING_LAUNCH, packageName).apply()
             Log.d(TAG, "📝 Requested launch for: $packageName")
+
+            // Send broadcast to immediately trigger check
+            val intent = Intent(ACTION_LAUNCH_APP)
+            intent.setPackage(context.packageName)
+            context.sendBroadcast(intent)
+            Log.d(TAG, "📡 Broadcast sent to trigger immediate check")
         }
 
         /**
@@ -46,8 +62,41 @@ class AppLauncherAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         Log.d(TAG, "✅ AppLauncherAccessibilityService connected")
 
-        // Check for pending launch request
+        // Setup periodic check
+        setupPeriodicCheck()
+
+        // Setup broadcast receiver for immediate launch requests
+        setupBroadcastReceiver()
+
+        // Check for pending launch request immediately
         checkPendingLaunch()
+    }
+
+    private fun setupPeriodicCheck() {
+        handler = Handler(Looper.getMainLooper())
+        checkRunnable = object : Runnable {
+            override fun run() {
+                checkPendingLaunch()
+                handler?.postDelayed(this, CHECK_INTERVAL_MS)
+            }
+        }
+        handler?.post(checkRunnable!!)
+        Log.d(TAG, "✅ Periodic check started (every ${CHECK_INTERVAL_MS}ms)")
+    }
+
+    private fun setupBroadcastReceiver() {
+        launchReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == ACTION_LAUNCH_APP) {
+                    Log.d(TAG, "📡 Received broadcast to check pending launch")
+                    checkPendingLaunch()
+                }
+            }
+        }
+
+        val filter = IntentFilter(ACTION_LAUNCH_APP)
+        registerReceiver(launchReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        Log.d(TAG, "✅ Broadcast receiver registered")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -105,6 +154,18 @@ class AppLauncherAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
+
+        // Stop periodic check
+        checkRunnable?.let { handler?.removeCallbacks(it) }
+        handler = null
+
+        // Unregister broadcast receiver
+        try {
+            launchReceiver?.let { unregisterReceiver(it) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unregistering receiver: ${e.message}")
+        }
+
         Log.w(TAG, "⚠️ AppLauncherAccessibilityService destroyed")
     }
 }
