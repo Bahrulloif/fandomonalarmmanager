@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextDirection
@@ -21,6 +22,9 @@ import com.tastamat.fandomon.ui.viewmodel.SettingsViewModel
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
+
+    // Force LTR text direction for ALL text fields
+    val ltrTextStyle = TextStyle(textDirection = TextDirection.Ltr)
 
     // Local state for number fields to allow empty input
     var checkIntervalText by remember { mutableStateOf(state.checkIntervalMinutes.toString()) }
@@ -166,7 +170,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                             onValueChange = { viewModel.updateDeviceId(it) },
                             label = { Text("Device ID") },
                             modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                            textStyle = ltrTextStyle
                         )
                     }
 
@@ -176,7 +180,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                             onValueChange = { viewModel.updateDeviceName(it) },
                             label = { Text("Device Name") },
                             modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                            textStyle = ltrTextStyle
                         )
                     }
                 }
@@ -201,7 +205,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                             onValueChange = { viewModel.updateFandomatPackageName(it) },
                             label = { Text("Fandomat Package Name") },
                             modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                            textStyle = ltrTextStyle
                         )
                     }
 
@@ -224,7 +228,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                             label = { Text("Check Interval (minutes)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
+                            textStyle = ltrTextStyle,
                             isError = checkIntervalText.isNotEmpty() && checkIntervalText.toIntOrNull() == null,
                             supportingText = if (checkIntervalText.isNotEmpty() && checkIntervalText.toIntOrNull() == null) {
                                 { Text("Please enter a valid number") }
@@ -251,7 +255,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                             label = { Text("Status Report Interval (minutes)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
+                            textStyle = ltrTextStyle,
                             isError = statusIntervalText.isNotEmpty() && statusIntervalText.toIntOrNull() == null,
                             supportingText = if (statusIntervalText.isNotEmpty() && statusIntervalText.toIntOrNull() == null) {
                                 { Text("Please enter a valid number") }
@@ -306,7 +310,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                                 onValueChange = { viewModel.updateMqttBrokerUrl(it) },
                                 label = { Text("Broker URL") },
                                 modifier = Modifier.fillMaxWidth(),
-                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                                textStyle = ltrTextStyle
                             )
                         }
 
@@ -329,7 +333,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                                 label = { Text("Port") },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.fillMaxWidth(),
-                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
+                                textStyle = ltrTextStyle,
                                 isError = mqttPortText.isNotEmpty() && (mqttPortText.toIntOrNull() == null || mqttPortText.toIntOrNull() !in 1..65535),
                                 supportingText = if (mqttPortText.isNotEmpty() && (mqttPortText.toIntOrNull() == null || mqttPortText.toIntOrNull() !in 1..65535)) {
                                     { Text("Port must be between 1 and 65535") }
@@ -343,7 +347,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                                 onValueChange = { viewModel.updateMqttUsername(it) },
                                 label = { Text("Username") },
                                 modifier = Modifier.fillMaxWidth(),
-                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                                textStyle = ltrTextStyle
                             )
                         }
 
@@ -354,7 +358,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                                 label = { Text("Password") },
                                 visualTransformation = PasswordVisualTransformation(),
                                 modifier = Modifier.fillMaxWidth(),
-                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                                textStyle = ltrTextStyle
                             )
                         }
 
@@ -364,7 +368,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                                 onValueChange = { viewModel.updateMqttTopicEvents(it) },
                                 label = { Text("Events Topic") },
                                 modifier = Modifier.fillMaxWidth(),
-                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                                textStyle = ltrTextStyle
                             )
                         }
 
@@ -374,7 +378,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                                 onValueChange = { viewModel.updateMqttTopicStatus(it) },
                                 label = { Text("Status Topic") },
                                 modifier = Modifier.fillMaxWidth(),
-                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                                textStyle = ltrTextStyle
                             )
                         }
 
@@ -384,7 +388,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                                 onValueChange = { viewModel.updateMqttTopicCommands(it) },
                                 label = { Text("Commands Topic") },
                                 modifier = Modifier.fillMaxWidth(),
-                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                                textStyle = ltrTextStyle
                             )
                         }
                     }
@@ -421,7 +425,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                                 onValueChange = { viewModel.updateRestBaseUrl(it) },
                                 label = { Text("Base URL") },
                                 modifier = Modifier.fillMaxWidth(),
-                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                                textStyle = ltrTextStyle
                             )
                         }
 
@@ -432,7 +436,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                                 label = { Text("API Key") },
                                 visualTransformation = PasswordVisualTransformation(),
                                 modifier = Modifier.fillMaxWidth(),
-                                textStyle = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+                                textStyle = ltrTextStyle
                             )
                         }
                     }
