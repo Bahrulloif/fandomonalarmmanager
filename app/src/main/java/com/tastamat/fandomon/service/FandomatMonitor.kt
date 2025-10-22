@@ -175,7 +175,10 @@ class FandomatMonitor(private val context: Context) {
             }
 
             val timestampStr = matchResult.groupValues[1]
-            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).apply {
+                // Use device's default timezone to match Fandomat's log timezone
+                timeZone = java.util.TimeZone.getDefault()
+            }
             val lastHeartbeat = dateFormat.parse(timestampStr)
 
             if (lastHeartbeat == null) {
