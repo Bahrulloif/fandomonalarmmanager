@@ -42,12 +42,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Check if we need to restore state after restart_fandomon command (in background)
-        // DO NOT block main thread!
-        lifecycleScope.launch(Dispatchers.IO) {
-            checkAndRestoreAfterRestart()
-        }
-
         setContent {
             Fandomon2Theme {
                 var showOnboarding by remember {
@@ -78,6 +72,14 @@ class MainActivity : ComponentActivity() {
 
         // Check Xiaomi autostart (background task)
         checkXiaomiAutostart()
+
+        // Check if we need to restore state after restart_fandomon command
+        // Run this with a delay to avoid blocking Activity creation
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            lifecycleScope.launch(Dispatchers.IO) {
+                checkAndRestoreAfterRestart()
+            }
+        }, 1000) // Wait 1 second after Activity is created
     }
 
     /**
