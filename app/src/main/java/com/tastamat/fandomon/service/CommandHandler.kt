@@ -178,22 +178,41 @@ class CommandHandler(private val context: Context) {
                 // Log the restart command
                 logCommandEvent(
                     "COMMAND_RESTART_FANDOMON",
-                    "Remote restart command received - restarting Fandomon"
+                    "Remote restart command received - restarting Fandomon, will relaunch Fandomat after"
                 )
 
-                // Cancel all alarms
+                // IMPORTANT: Check if monitoring was active and if Fandomat was running
+                val preferences = AppPreferences(context)
+                val monitoringWasActive = preferences.monitoringActive.first()
+                val fandomatPackage = preferences.fandomatPackageName.first()
+
+                Log.d(TAG, "📝 Before restart - Monitoring active: $monitoringWasActive")
+                Log.d(TAG, "📝 Target app: $fandomatPackage")
+
+                // Save flag to restore state after restart
+                val prefs = context.getSharedPreferences("restart_prefs", Context.MODE_PRIVATE)
+                prefs.edit().apply {
+                    putBoolean("should_restore_monitoring", monitoringWasActive)
+                    putBoolean("should_launch_fandomat", true) // Always launch Fandomat after Fandomon restart
+                    putLong("restart_timestamp", System.currentTimeMillis())
+                    apply()
+                }
+                Log.d(TAG, "✅ Saved restart flags - will relaunch Fandomat after restart")
+
+                // Cancel all alarms (will be rescheduled after restart)
                 AlarmScheduler(context).cancelAllAlarms()
 
                 // Restart the app by launching MainActivity with NEW_TASK flag
                 val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
                 intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
 
-                // Small delay to ensure event is logged
-                kotlinx.coroutines.delay(500)
+                // Small delay to ensure everything is saved
+                kotlinx.coroutines.delay(1000)
 
                 if (intent != null) {
                     context.startActivity(intent)
                     Log.d(TAG, "✅ RESTART_FANDOMON command executed - app restarting")
+                    Log.d(TAG, "📱 After restart: will restore monitoring and launch Fandomat to foreground")
 
                     // Exit current process to force restart
                     android.os.Process.killProcess(android.os.Process.myPid())

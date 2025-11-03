@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.compose.runtime.*
 import com.tastamat.fandomon.data.preferences.AppPreferences
 import com.tastamat.fandomon.service.DataSyncService
+import kotlinx.coroutines.Dispatchers
 import com.tastamat.fandomon.ui.screen.OnboardingScreen
 import com.tastamat.fandomon.ui.screen.SettingsScreen
 import com.tastamat.fandomon.ui.theme.Fandomon2Theme
@@ -40,6 +41,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Check if we need to restore state after restart_fandomon command (in background)
+        // DO NOT block main thread!
+        lifecycleScope.launch(Dispatchers.IO) {
+            checkAndRestoreAfterRestart()
+        }
 
         setContent {
             Fandomon2Theme {
@@ -71,6 +78,98 @@ class MainActivity : ComponentActivity() {
 
         // Check Xiaomi autostart (background task)
         checkXiaomiAutostart()
+    }
+
+    /**
+     * Check if this is a restart after restart_fandomon command
+     * If so, restore monitoring and launch Fandomat
+     * This is a suspend function that runs on IO dispatcher
+     */
+    private suspend fun checkAndRestoreAfterRestart() {
+        try {
+            val prefs = getSharedPreferences("restart_prefs", Context.MODE_PRIVATE)
+            val shouldRestoreMonitoring = prefs.getBoolean("should_restore_monitoring", false)
+            val shouldLaunchFandomat = prefs.getBoolean("should_launch_fandomat", false)
+            val restartTimestamp = prefs.getLong("restart_timestamp", 0)
+
+            // Check if this is a recent restart (within last 30 seconds)
+            val timeSinceRestart = System.currentTimeMillis() - restartTimestamp
+            val isRecentRestart = timeSinceRestart < 30000
+
+            if (isRecentRestart && (shouldRestoreMonitoring || shouldLaunchFandomat)) {
+                Log.d("MainActivity", "")
+                Log.d("MainActivity", "========================================")
+                Log.d("MainActivity", "🔄 DETECTED RESTART AFTER restart_fandomon COMMAND")
+                Log.d("MainActivity", "========================================")
+                Log.d("MainActivity", "📝 Should restore monitoring: $shouldRestoreMonitoring")
+                Log.d("MainActivity", "📝 Should launch Fandomat: $shouldLaunchFandomat")
+                Log.d("MainActivity", "⏱️  Time since restart: ${timeSinceRestart}ms")
+                Log.d("MainActivity", "")
+
+                // Clear the flags
+                prefs.edit().clear().apply()
+
+                // Give UI time to initialize
+                kotlinx.coroutines.delay(2000)
+
+                // Restore monitoring if it was active
+                if (shouldRestoreMonitoring) {
+                    Log.d("MainActivity", "🔄 Restoring monitoring state...")
+                    val preferences = AppPreferences(applicationContext)
+                    val checkInterval = preferences.checkIntervalMinutes.first()
+                    val statusInterval = preferences.statusReportIntervalMinutes.first()
+
+                    val scheduler = com.tastamat.fandomon.service.AlarmScheduler(applicationContext)
+                    scheduler.scheduleMonitoring(checkInterval, statusInterval)
+                    Log.d("MainActivity", "✅ Monitoring restored (check: ${checkInterval}min, status: ${statusInterval}min)")
+                }
+
+                // Launch Fandomat back to foreground
+                if (shouldLaunchFandomat) {
+                    Log.d("MainActivity", "")
+                    Log.d("MainActivity", "📱 Launching Fandomat back to FOREGROUND...")
+                    Log.d("MainActivity", "")
+
+                    val preferences = AppPreferences(applicationContext)
+                    val packageName = preferences.fandomatPackageName.first()
+
+                    // Use Accessibility Service if available
+                    if (com.tastamat.fandomon.service.AppLauncherAccessibilityService.isEnabled(applicationContext)) {
+                        Log.d("MainActivity", "🤖 Using Accessibility Service to launch Fandomat")
+                        com.tastamat.fandomon.service.AppLauncherAccessibilityService.requestAppLaunch(
+                            applicationContext,
+                            packageName
+                        )
+                        kotlinx.coroutines.delay(3000)
+                        Log.d("MainActivity", "✅ Fandomat should now be visible on screen")
+                    } else {
+                        Log.w("MainActivity", "⚠️ Accessibility Service not enabled")
+                        Log.w("MainActivity", "⚠️ Trying shell command...")
+
+                        // Fallback to shell command
+                        try {
+                            val command = "am start -W -S -n $packageName/.MainActivity"
+                            Runtime.getRuntime().exec(command)
+                            kotlinx.coroutines.delay(2000)
+                            Log.d("MainActivity", "✅ Fandomat launched via shell")
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "❌ Failed to launch Fandomat: ${e.message}")
+                        }
+                    }
+
+                    Log.d("MainActivity", "")
+                    Log.d("MainActivity", "✅ POST-RESTART RESTORATION COMPLETE")
+                    Log.d("MainActivity", "📱 Fandomat should be on foreground now")
+                    Log.d("MainActivity", "========================================")
+                    Log.d("MainActivity", "")
+                }
+            } else if (restartTimestamp > 0) {
+                Log.d("MainActivity", "⏰ Restart was too long ago (${timeSinceRestart}ms) - ignoring")
+                prefs.edit().clear().apply()
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "❌ Error restoring state after restart: ${e.message}", e)
+        }
     }
 
 
