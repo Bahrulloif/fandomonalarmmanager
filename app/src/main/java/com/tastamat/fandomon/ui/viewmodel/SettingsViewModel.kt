@@ -28,7 +28,8 @@ data class SettingsState(
     val statusReportIntervalMinutes: Int = 15,
     val fandomatPackageName: String = "com.tastamat.fandomat",
     val autoRestartEnabled: Boolean = true,
-    val isMonitoringActive: Boolean = false  // New: track monitoring state
+    val isMonitoringActive: Boolean = false,  // New: track monitoring state
+    val heartbeatEnabled: Boolean = true  // New: heartbeat freeze detection
 )
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -63,7 +64,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 statusReportIntervalMinutes = preferences.statusReportIntervalMinutes.first(),
                 fandomatPackageName = preferences.fandomatPackageName.first(),
                 autoRestartEnabled = preferences.autoRestartEnabled.first(),
-                isMonitoringActive = preferences.monitoringActive.first()
+                isMonitoringActive = preferences.monitoringActive.first(),
+                heartbeatEnabled = preferences.heartbeatEnabled.first()
             )
         }
     }
@@ -186,6 +188,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             preferences.setAutoRestartEnabled(enabled)
             _state.value = _state.value.copy(autoRestartEnabled = enabled)
+        }
+    }
+
+    fun updateHeartbeatEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferences.setHeartbeatEnabled(enabled)
+            _state.value = _state.value.copy(heartbeatEnabled = enabled)
         }
     }
 

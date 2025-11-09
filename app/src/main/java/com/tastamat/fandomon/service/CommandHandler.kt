@@ -175,53 +175,77 @@ class CommandHandler(private val context: Context) {
         Log.d(TAG, "🔄 Executing RESTART_FANDOMON command")
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                // Show toast notification that restart is starting
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    android.widget.Toast.makeText(
+                        context,
+                        "🔄 Restarting Fandomon services...",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+
                 // Log the restart command
                 logCommandEvent(
                     "COMMAND_RESTART_FANDOMON",
-                    "Remote restart command received - restarting Fandomon, will relaunch Fandomat after"
+                    "Restarting monitoring and MQTT connection"
                 )
 
-                // IMPORTANT: Check if monitoring was active and if Fandomat was running
+                Log.d(TAG, "🔄 Restarting Fandomon services (soft restart)...")
+
                 val preferences = AppPreferences(context)
-                val monitoringWasActive = preferences.monitoringActive.first()
-                val fandomatPackage = preferences.fandomatPackageName.first()
 
-                Log.d(TAG, "📝 Before restart - Monitoring active: $monitoringWasActive")
-                Log.d(TAG, "📝 Target app: $fandomatPackage")
-
-                // Save flag to restore state after restart
-                val prefs = context.getSharedPreferences("restart_prefs", Context.MODE_PRIVATE)
-                prefs.edit().apply {
-                    putBoolean("should_restore_monitoring", monitoringWasActive)
-                    putBoolean("should_launch_fandomat", true) // Always launch Fandomat after Fandomon restart
-                    putLong("restart_timestamp", System.currentTimeMillis())
-                    apply()
-                }
-                Log.d(TAG, "✅ Saved restart flags - will relaunch Fandomat after restart")
-
-                // Cancel all alarms (will be rescheduled after restart)
+                // Step 1: Cancel all existing alarms
+                Log.d(TAG, "📌 Step 1: Canceling all alarms...")
                 AlarmScheduler(context).cancelAllAlarms()
+                kotlinx.coroutines.delay(500)
 
-                // Restart the app by launching MainActivity with NEW_TASK flag
-                val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-                intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                // Step 2: Restart monitoring with current settings
+                val monitoringActive = preferences.monitoringActive.first()
+                if (monitoringActive) {
+                    Log.d(TAG, "📌 Step 2: Restarting monitoring...")
+                    val checkInterval = preferences.checkIntervalMinutes.first()
+                    val statusInterval = preferences.statusReportIntervalMinutes.first()
+                    AlarmScheduler(context).scheduleMonitoring(checkInterval, statusInterval)
+                    Log.d(TAG, "✅ Monitoring restarted (check: ${checkInterval}min, status: ${statusInterval}min)")
+                } else {
+                    Log.d(TAG, "⏸️ Monitoring was not active, skipping")
+                }
 
-                // Small delay to ensure everything is saved
-                kotlinx.coroutines.delay(1000)
+                kotlinx.coroutines.delay(500)
 
-                if (intent != null) {
-                    context.startActivity(intent)
-                    Log.d(TAG, "✅ RESTART_FANDOMON command executed - app restarting")
-                    Log.d(TAG, "📱 After restart: will restore monitoring and launch Fandomat to foreground")
+                // Step 3: Reconnect to MQTT
+                Log.d(TAG, "📌 Step 3: Reconnecting to MQTT...")
+                try {
+                    val dataSyncService = DataSyncService(context)
+                    dataSyncService.subscribeToCommands()
+                    Log.d(TAG, "✅ MQTT reconnected successfully")
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ MQTT reconnection failed: ${e.message}")
+                }
 
-                    // Exit current process to force restart
-                    android.os.Process.killProcess(android.os.Process.myPid())
+                Log.d(TAG, "✅ RESTART_FANDOMON completed - all services restarted")
+
+                // Create success event - will be sent during next periodic sync
+                val successEvent = MonitorEvent(
+                    eventType = EventType.COMMAND_RESTART_FANDOMON_SUCCESS,
+                    message = "Fandomon restarted successfully - monitoring: ${if (monitoringActive) "active" else "inactive"}, MQTT: reconnected"
+                )
+                eventRepository.insertEvent(successEvent)
+                Log.d(TAG, "✅ Restart success event created - will be sent via MQTT during next sync")
+
+                // Show completion toast
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    android.widget.Toast.makeText(
+                        context,
+                        "✅ Fandomon restarted successfully!",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Error executing RESTART_FANDOMON: ${e.message}", e)
                 logCommandEvent(
                     "COMMAND_RESTART_FANDOMON_FAILED",
-                    "Failed to restart Fandomon: ${e.message}"
+                    "Failed to restart: ${e.message}"
                 )
             }
         }

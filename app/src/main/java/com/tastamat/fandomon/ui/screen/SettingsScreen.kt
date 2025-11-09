@@ -293,6 +293,28 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                             onCheckedChange = { viewModel.updateAutoRestartEnabled(it) }
                         )
                     }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Heartbeat Freeze Detection",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                text = "Check logfile.txt for app freeze detection",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = state.heartbeatEnabled,
+                            onCheckedChange = { viewModel.updateHeartbeatEnabled(it) }
+                        )
+                    }
                 }
             }
 

@@ -34,6 +34,7 @@ class AppPreferences(private val context: Context) {
         val AUTO_RESTART_ENABLED = booleanPreferencesKey("auto_restart_enabled")
         val MONITORING_ACTIVE = booleanPreferencesKey("monitoring_active")
         val AUTOSTART_DIALOG_SHOWN = booleanPreferencesKey("autostart_dialog_shown")
+        val HEARTBEAT_ENABLED = booleanPreferencesKey("heartbeat_enabled")
     }
 
     val deviceId: Flow<String> = context.dataStore.data.map { it[DEVICE_ID] ?: "" }
@@ -58,6 +59,7 @@ class AppPreferences(private val context: Context) {
     val autoRestartEnabled: Flow<Boolean> = context.dataStore.data.map { it[AUTO_RESTART_ENABLED] ?: true }
     val monitoringActive: Flow<Boolean> = context.dataStore.data.map { it[MONITORING_ACTIVE] ?: false }
     val autostartDialogShown: Flow<Boolean> = context.dataStore.data.map { it[AUTOSTART_DIALOG_SHOWN] ?: false }
+    val heartbeatEnabled: Flow<Boolean> = context.dataStore.data.map { it[HEARTBEAT_ENABLED] ?: true }
 
     suspend fun setDeviceId(deviceId: String) {
         context.dataStore.edit { it[DEVICE_ID] = deviceId }
@@ -133,5 +135,9 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setAutostartDialogShown(shown: Boolean) {
         context.dataStore.edit { it[AUTOSTART_DIALOG_SHOWN] = shown }
+    }
+
+    suspend fun setHeartbeatEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[HEARTBEAT_ENABLED] = enabled }
     }
 }

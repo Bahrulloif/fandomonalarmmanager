@@ -7,6 +7,7 @@ import android.os.Build
 import android.util.Log
 import com.tastamat.fandomon.data.preferences.AppPreferences
 import com.tastamat.fandomon.service.AlarmScheduler
+import com.tastamat.fandomon.service.DataSyncService
 import com.tastamat.fandomon.utils.XiaomiUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -79,6 +80,30 @@ class BootReceiver : BroadcastReceiver() {
 
                     Log.d(TAG, "✅✅✅ Monitoring alarms scheduled successfully after boot")
                     Log.d(TAG, "Check interval: ${checkInterval}min, Status interval: ${statusInterval}min")
+
+                    // Subscribe to MQTT commands for remote control
+                    Log.d(TAG, "📡 Subscribing to MQTT commands...")
+                    try {
+                        val dataSyncService = DataSyncService(context)
+                        dataSyncService.subscribeToCommands()
+                        Log.d(TAG, "✅ MQTT commands subscription successful")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "❌ Error subscribing to MQTT commands: ${e.message}", e)
+                    }
+
+                    // Launch MainActivity in background to ensure MQTT stays connected
+                    // This is needed for full automation without human intervention
+                    Log.d(TAG, "📱 Launching MainActivity to ensure MQTT connection...")
+                    try {
+                        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                        intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        intent?.let {
+                            context.startActivity(it)
+                            Log.d(TAG, "✅ MainActivity launched successfully")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "❌ Failed to launch MainActivity: ${e.message}", e)
+                    }
 
                     // Если это Xiaomi, напоминаем о необходимости включения автозапуска
                     if (XiaomiUtils.isXiaomiDevice()) {

@@ -5,10 +5,21 @@ import android.util.Log
 import org.eclipse.paho.client.mqttv3.*
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 
-class MqttClientManager(private val context: Context) {
+class MqttClientManager private constructor(private val context: Context) {
 
     private var mqttClient: MqttClient? = null
     private val TAG = "MqttClientManager"
+
+    companion object {
+        @Volatile
+        private var INSTANCE: MqttClientManager? = null
+
+        fun getInstance(context: Context): MqttClientManager {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: MqttClientManager(context.applicationContext).also { INSTANCE = it }
+            }
+        }
+    }
 
     fun connect(
         brokerUrl: String,
@@ -19,20 +30,31 @@ class MqttClientManager(private val context: Context) {
         onFailure: (Throwable) -> Unit = {}
     ) {
         try {
+            // If already connected, reuse existing connection
+            if (mqttClient?.isConnected == true) {
+                Log.d(TAG, "Already connected to MQTT broker - reusing connection")
+                onSuccess()
+                return
+            }
+
             val serverUri = "tcp://$brokerUrl:$port"
-            val clientId = "Fandomon_${System.currentTimeMillis()}"
+            // Use FIXED client ID based on device
+            val clientId = "Fandomon_${android.provider.Settings.Secure.getString(
+                context.contentResolver,
+                android.provider.Settings.Secure.ANDROID_ID
+            )}"
 
             mqttClient = MqttClient(serverUri, clientId, MemoryPersistence())
 
             val options = MqttConnectOptions()
-            options.isCleanSession = true
+            options.isCleanSession = false  // Preserve subscriptions
             options.userName = username
             options.password = password.toCharArray()
             options.connectionTimeout = 30
             options.keepAliveInterval = 60
 
             mqttClient?.connect(options)
-            Log.d(TAG, "Connected to MQTT broker")
+            Log.d(TAG, "Connected to MQTT broker with client ID: $clientId")
             onSuccess()
         } catch (e: Exception) {
             Log.e(TAG, "Error connecting to MQTT", e)

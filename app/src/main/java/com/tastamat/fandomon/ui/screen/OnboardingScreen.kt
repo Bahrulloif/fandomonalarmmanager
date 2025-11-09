@@ -11,7 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.tastamat.fandomon.utils.PermissionUtils
-import com.tastamat.fandomon.utils.XiaomiUtils
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -21,13 +20,11 @@ fun OnboardingScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
 
     val usageGranted = remember { mutableStateOf<Boolean>(PermissionUtils.hasUsageStatsPermission(context)) }
-    val notificationsEnabled = remember { mutableStateOf<Boolean>(PermissionUtils.areNotificationsEnabled(context)) }
     val exactAlarmsOk = remember { mutableStateOf<Boolean>(PermissionUtils.canScheduleExactAlarms(context)) }
     val accessibilityEnabled = remember { mutableStateOf<Boolean>(PermissionUtils.isAccessibilityServiceEnabled(context)) }
     val storageGranted = remember { mutableStateOf<Boolean>(PermissionUtils.hasStoragePermission(context)) }
-    val isXiaomi = remember { mutableStateOf<Boolean>(XiaomiUtils.isXiaomiDevice()) }
 
-    val allOk = usageGranted.value && notificationsEnabled.value && exactAlarmsOk.value && accessibilityEnabled.value && storageGranted.value
+    val allOk = usageGranted.value && exactAlarmsOk.value && accessibilityEnabled.value && storageGranted.value
 
     Scaffold(
         topBar = {
@@ -62,18 +59,6 @@ fun OnboardingScreen(
                 }
             }
 
-            // Notifications
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Notifications", style = MaterialTheme.typography.titleMedium)
-                    Text("Needed for high-priority restart prompts on Android 10+.")
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { PermissionUtils.openNotificationSettings(context) }) { Text("Open Settings") }
-                        OutlinedButton(onClick = { notificationsEnabled.value = PermissionUtils.areNotificationsEnabled(context) }) { Text("Re-check") }
-                    }
-                }
-            }
-
             // Exact alarms
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -102,7 +87,7 @@ fun OnboardingScreen(
                     )
                     Text(
                         "REQUIRED for automatic restart without user interaction on Android 10+. " +
-                        "Without this, you will receive notifications that require manual tapping.",
+                        "Without this, automatic restart will NOT work!",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
@@ -151,20 +136,6 @@ fun OnboardingScreen(
                             storageGranted.value = PermissionUtils.hasStoragePermission(context)
                         }) {
                             Text("Re-check")
-                        }
-                    }
-                }
-            }
-
-            // Xiaomi / MIUI specific
-            if (isXiaomi.value) {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Xiaomi/MIUI Settings", style = MaterialTheme.typography.titleMedium)
-                        Text("Enable Autostart and disable battery restrictions.")
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = { XiaomiUtils.openAutoStartSettings(context) }) { Text("Open Autostart") }
-                            Button(onClick = { XiaomiUtils.openBatterySettings(context) }) { Text("Open Battery") }
                         }
                     }
                 }

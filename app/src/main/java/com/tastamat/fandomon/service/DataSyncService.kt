@@ -18,7 +18,7 @@ class DataSyncService(private val context: Context) {
     private val TAG = "DataSyncService"
     private val eventRepository = EventRepository(FandomonDatabase.getDatabase(context).eventDao())
     private val preferences = AppPreferences(context)
-    private val mqttClient = MqttClientManager(context)
+    private val mqttClient = MqttClientManager.getInstance(context)
     private val gson = Gson()
     private val commandHandler = CommandHandler(context)
 

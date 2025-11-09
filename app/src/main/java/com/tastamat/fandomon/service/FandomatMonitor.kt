@@ -1,17 +1,11 @@
 package com.tastamat.fandomon.service
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Environment
 import android.util.Log
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
-import com.tastamat.fandomon.R
 import com.tastamat.fandomon.data.local.FandomonDatabase
 import com.tastamat.fandomon.data.model.EventType
 import com.tastamat.fandomon.data.model.MonitorEvent
@@ -29,32 +23,6 @@ class FandomatMonitor(private val context: Context) {
     private val eventRepository = EventRepository(FandomonDatabase.getDatabase(context).eventDao())
     private val preferences = AppPreferences(context)
 
-    companion object {
-        private const val RESTART_NOTIFICATION_CHANNEL_ID = "fandomon_restart_channel"
-        private const val RESTART_NOTIFICATION_ID = 9999
-    }
-
-    init {
-        createNotificationChannel()
-    }
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = "App Restart Notifications"
-            val descriptionText = "Critical notifications for restarting monitored applications"
-            val importance = NotificationManager.IMPORTANCE_HIGH
-            val channel = NotificationChannel(RESTART_NOTIFICATION_CHANNEL_ID, name, importance).apply {
-                description = descriptionText
-                setShowBadge(true)
-                enableVibration(true)
-            }
-
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
-            Log.d(TAG, "✅ Restart notification channel created")
-        }
-    }
-
     /**
      * Check if Fandomat is running in foreground.
      * If not running and auto-restart is enabled, attempts to restart the app.
@@ -70,13 +38,23 @@ class FandomatMonitor(private val context: Context) {
         Log.d(TAG, "Auto-restart: ${if (autoRestartEnabled) "ENABLED ✅" else "DISABLED ❌"}")
 
         val checkIntervalMinutes = preferences.checkIntervalMinutes.first()
+        val heartbeatEnabled = preferences.heartbeatEnabled.first()
 
         val isRunning = isAppInForeground(packageName)
-        val isResponding = if (isRunning) checkIfAppResponding(packageName, checkIntervalMinutes) else false
+        val isResponding = if (isRunning && heartbeatEnabled) {
+            checkIfAppResponding(packageName, checkIntervalMinutes)
+        } else {
+            true  // If heartbeat disabled, assume app is responding
+        }
 
         Log.d(TAG, "Fandomat ($packageName) running in foreground: $isRunning")
-        if (isRunning) {
-            Log.d(TAG, "Fandomat responding: $isResponding")
+        if (heartbeatEnabled) {
+            Log.d(TAG, "Heartbeat monitoring: ENABLED")
+            if (isRunning) {
+                Log.d(TAG, "Fandomat responding: $isResponding")
+            }
+        } else {
+            Log.d(TAG, "Heartbeat monitoring: DISABLED (skip freeze detection)")
         }
 
         // Check if app is frozen/not responding
@@ -264,7 +242,6 @@ class FandomatMonitor(private val context: Context) {
      * 1. Accessibility Service (FULLY AUTOMATIC on Android 10+) - BEST METHOD
      * 2. Shell command (works on some devices)
      * 3. Direct startActivity (may work on older Android)
-     * 4. Notification (FALLBACK - requires user tap)
      */
     private suspend fun restartFandomat(packageName: String): Boolean {
         try {
@@ -315,7 +292,7 @@ class FandomatMonitor(private val context: Context) {
                 Log.w(TAG, "⚠️⚠️⚠️ ACCESSIBILITY SERVICE NOT ENABLED!")
                 Log.w(TAG, "⚠️⚠️⚠️ Automatic restart is DISABLED without it!")
                 Log.w(TAG, "⚠️ Enable it: Settings → Accessibility → Fandomon Auto Launcher")
-                Log.w(TAG, "⚠️ Without Accessibility Service, will try other methods and fallback to notification")
+                Log.w(TAG, "⚠️ Without Accessibility Service, will try other methods but may fail on Android 10+")
                 Log.w(TAG, "")
             }
 
@@ -384,33 +361,19 @@ class FandomatMonitor(private val context: Context) {
                 Log.w(TAG, "⚠️ startActivity error: ${e.message}")
             }
 
-            // Method 4: FALLBACK - Send notification (REQUIRES USER TO TAP)
-            Log.w(TAG, "")
-            Log.w(TAG, "⚠️⚠️⚠️ All automatic methods failed!")
-            Log.w(TAG, "⚠️⚠️⚠️ Falling back to NOTIFICATION - USER MUST TAP IT!")
-            Log.w(TAG, "")
+            // All automatic restart methods have failed
+            Log.e(TAG, "")
+            Log.e(TAG, "❌❌❌ All automatic restart methods FAILED!")
+            Log.e(TAG, "❌ Manual intervention required on remote device")
+            Log.e(TAG, "")
 
-            val notificationSuccess = sendRestartNotification(packageName)
-
-            if (notificationSuccess) {
-                val event = MonitorEvent(
-                    eventType = EventType.FANDOMAT_RESTARTED,
-                    message = "⚠️ Automatic restart failed - Notification sent - USER MUST TAP to restart app"
-                )
-                eventRepository.insertEvent(event)
-                Log.w(TAG, "📱 Notification sent - WAITING FOR USER TO TAP")
-                Log.d(TAG, "==============================================")
-                return true  // We did what we could
-            } else {
-                Log.e(TAG, "❌ Failed to send notification!")
-                val event = MonitorEvent(
-                    eventType = EventType.FANDOMAT_STOPPED,
-                    message = "❌ All restart methods failed including notification - manual intervention required"
-                )
-                eventRepository.insertEvent(event)
-                Log.d(TAG, "==============================================")
-                return false
-            }
+            val event = MonitorEvent(
+                eventType = EventType.FANDOMAT_STOPPED,
+                message = "❌ All automatic restart methods failed - manual intervention required"
+            )
+            eventRepository.insertEvent(event)
+            Log.d(TAG, "==============================================")
+            return false
         } catch (e: Exception) {
             Log.e(TAG, "Error restarting Fandomat: ${e.message}", e)
 
@@ -425,68 +388,6 @@ class FandomatMonitor(private val context: Context) {
         return false
     }
 
-    /**
-     * Send high-priority notification to restart the app
-     * On Android 10+, notifications can trigger PendingIntents to start activities
-     */
-    private fun sendRestartNotification(packageName: String): Boolean {
-        try {
-            val intent = context.packageManager.getLaunchIntentForPackage(packageName)
-            if (intent == null) {
-                Log.e(TAG, "❌ Cannot create notification: launch intent not found for $packageName")
-                return false
-            }
-
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-
-            val pendingIntentFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            } else {
-                PendingIntent.FLAG_UPDATE_CURRENT
-            }
-
-            val pendingIntent = PendingIntent.getActivity(
-                context,
-                0,
-                intent,
-                pendingIntentFlags
-            )
-
-            // Get app name
-            val pm = context.packageManager
-            val appInfo = pm.getApplicationInfo(packageName, 0)
-            val appName = pm.getApplicationLabel(appInfo).toString()
-
-            val notification = NotificationCompat.Builder(context, RESTART_NOTIFICATION_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
-                .setContentTitle("$appName stopped")
-                .setContentText("Tap to restart $appName")
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_ALARM)
-                .setAutoCancel(true)
-                .setContentIntent(pendingIntent)
-                .setFullScreenIntent(pendingIntent, true) // This allows launching even when locked
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .build()
-
-            val notificationManager = NotificationManagerCompat.from(context)
-
-            try {
-                notificationManager.notify(RESTART_NOTIFICATION_ID, notification)
-                Log.d(TAG, "✅ High-priority restart notification sent for $appName")
-                return true
-            } catch (e: SecurityException) {
-                Log.e(TAG, "❌ Notification permission denied: ${e.message}")
-                return false
-            }
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Error sending restart notification: ${e.message}", e)
-            return false
-        }
-    }
 
     private fun isAppInForeground(packageName: String): Boolean {
         Log.d(TAG, "=== Checking if $packageName is in FOREGROUND ===")
