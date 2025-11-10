@@ -11,7 +11,11 @@ import com.tastamat.fandomon.data.remote.dto.EventDto
 import com.tastamat.fandomon.data.remote.dto.StatusDto
 import com.tastamat.fandomon.data.remote.mqtt.MqttClientManager
 import com.tastamat.fandomon.data.repository.EventRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 class DataSyncService(private val context: Context) {
 
@@ -102,49 +106,52 @@ class DataSyncService(private val context: Context) {
 
     private suspend fun sendViaMqtt(data: Any, isEvent: Boolean): Boolean {
         return try {
-            val brokerUrl = preferences.mqttBrokerUrl.first()
-            val port = preferences.mqttPort.first()
-            val username = preferences.mqttUsername.first()
-            val password = preferences.mqttPassword.first()
+            withContext(Dispatchers.IO) {
+                val brokerUrl = preferences.mqttBrokerUrl.first()
+                val port = preferences.mqttPort.first()
+                val username = preferences.mqttUsername.first()
+                val password = preferences.mqttPassword.first()
 
-            if (brokerUrl.isEmpty()) {
-                Log.w(TAG, "MQTT broker URL is not configured")
-                return false
+                if (brokerUrl.isEmpty()) {
+                    Log.w(TAG, "MQTT broker URL is not configured")
+                    return@withContext false
+                }
+
+                // Connect to MQTT using suspendCoroutine for async/await
+                if (!mqttClient.isConnected()) {
+                    val connected = suspendCoroutine<Boolean> { continuation ->
+                        mqttClient.connect(
+                            brokerUrl = brokerUrl,
+                            port = port,
+                            username = username,
+                            password = password,
+                            onSuccess = { continuation.resume(true) },
+                            onFailure = { continuation.resume(false) }
+                        )
+                    }
+                    if (!connected) return@withContext false
+                }
+
+                val topic = if (isEvent) {
+                    preferences.mqttTopicEvents.first()
+                } else {
+                    preferences.mqttTopicStatus.first()
+                }
+
+                val message = gson.toJson(data)
+
+                // Publish message using suspendCoroutine for async/await
+                val publishSuccess = suspendCoroutine<Boolean> { continuation ->
+                    mqttClient.publish(
+                        topic = topic,
+                        message = message,
+                        onSuccess = { continuation.resume(true) },
+                        onFailure = { continuation.resume(false) }
+                    )
+                }
+
+                publishSuccess
             }
-
-            if (!mqttClient.isConnected()) {
-                var connected = false
-                mqttClient.connect(
-                    brokerUrl = brokerUrl,
-                    port = port,
-                    username = username,
-                    password = password,
-                    onSuccess = { connected = true },
-                    onFailure = { connected = false }
-                )
-                // Wait for connection with proper coroutine delay
-                kotlinx.coroutines.delay(2000)
-                if (!connected) return false
-            }
-
-            val topic = if (isEvent) {
-                preferences.mqttTopicEvents.first()
-            } else {
-                preferences.mqttTopicStatus.first()
-            }
-
-            val message = gson.toJson(data)
-            var publishSuccess = false
-
-            mqttClient.publish(
-                topic = topic,
-                message = message,
-                onSuccess = { publishSuccess = true },
-                onFailure = { publishSuccess = false }
-            )
-
-            kotlinx.coroutines.delay(1000) // Wait for publish
-            publishSuccess
         } catch (e: Exception) {
             Log.e(TAG, "Error sending via MQTT", e)
             false
@@ -215,89 +222,101 @@ class DataSyncService(private val context: Context) {
      * Subscribes to TWO topics:
      * 1. Broadcast topic (general commands for all devices): fandomon/commands
      * 2. Device-specific topic (targeted commands): fandomon/{device_id}/commands
+     *
+     * This method is now fully asynchronous and safe to call from UI thread.
      */
     suspend fun subscribeToCommands() {
         try {
-            val mqttEnabled = preferences.mqttEnabled.first()
-            if (!mqttEnabled) {
-                Log.d(TAG, "MQTT is disabled, skipping command subscription")
-                return
-            }
+            withContext(Dispatchers.IO) {
+                val mqttEnabled = preferences.mqttEnabled.first()
+                if (!mqttEnabled) {
+                    Log.d(TAG, "MQTT is disabled, skipping command subscription")
+                    return@withContext
+                }
 
-            val brokerUrl = preferences.mqttBrokerUrl.first()
-            val port = preferences.mqttPort.first()
-            val username = preferences.mqttUsername.first()
-            val password = preferences.mqttPassword.first()
+                val brokerUrl = preferences.mqttBrokerUrl.first()
+                val port = preferences.mqttPort.first()
+                val username = preferences.mqttUsername.first()
+                val password = preferences.mqttPassword.first()
 
-            if (brokerUrl.isEmpty()) {
-                Log.w(TAG, "MQTT broker URL is not configured")
-                return
-            }
+                if (brokerUrl.isEmpty()) {
+                    Log.w(TAG, "MQTT broker URL is not configured")
+                    return@withContext
+                }
 
-            // Connect to MQTT if not already connected
-            if (!mqttClient.isConnected()) {
-                var connected = false
-                mqttClient.connect(
-                    brokerUrl = brokerUrl,
-                    port = port,
-                    username = username,
-                    password = password,
-                    onSuccess = {
-                        connected = true
-                        Log.d(TAG, "✅ Connected to MQTT broker for commands")
-                    },
-                    onFailure = {
-                        connected = false
-                        Log.e(TAG, "❌ Failed to connect to MQTT broker")
+                // Connect to MQTT if not already connected - using suspendCoroutine for async/await
+                if (!mqttClient.isConnected()) {
+                    val connected = suspendCoroutine<Boolean> { continuation ->
+                        mqttClient.connect(
+                            brokerUrl = brokerUrl,
+                            port = port,
+                            username = username,
+                            password = password,
+                            onSuccess = {
+                                Log.d(TAG, "✅ Connected to MQTT broker for commands")
+                                continuation.resume(true)
+                            },
+                            onFailure = {
+                                Log.e(TAG, "❌ Failed to connect to MQTT broker")
+                                continuation.resume(false)
+                            }
+                        )
                     }
-                )
-                kotlinx.coroutines.delay(2000) // Wait for connection
-                if (!connected) return
+                    if (!connected) return@withContext
+                }
+
+                val deviceId = getDeviceId()
+
+                // Subscribe to BROADCAST commands topic (all devices)
+                val broadcastTopic = preferences.mqttTopicCommands.first()
+                suspendCoroutine<Unit> { continuation ->
+                    mqttClient.subscribe(
+                        topic = broadcastTopic,
+                        qos = 1,
+                        onMessageReceived = { topic, message ->
+                            Log.d(TAG, "📥 BROADCAST command received on [$topic]: $message")
+                            handleIncomingCommand(message, isBroadcast = true)
+                        },
+                        onSuccess = {
+                            Log.d(TAG, "✅ Subscribed to BROADCAST commands: $broadcastTopic")
+                            continuation.resume(Unit)
+                        },
+                        onFailure = { error ->
+                            Log.e(TAG, "❌ Failed to subscribe to broadcast commands: ${error.message}")
+                            continuation.resume(Unit)
+                        }
+                    )
+                }
+
+                // Subscribe to DEVICE-SPECIFIC commands topic
+                val deviceSpecificTopic = "fandomon/$deviceId/commands"
+                suspendCoroutine<Unit> { continuation ->
+                    mqttClient.subscribe(
+                        topic = deviceSpecificTopic,
+                        qos = 1,
+                        onMessageReceived = { topic, message ->
+                            Log.d(TAG, "📥 TARGETED command received on [$topic]: $message")
+                            handleIncomingCommand(message, isBroadcast = false)
+                        },
+                        onSuccess = {
+                            Log.d(TAG, "✅ Subscribed to DEVICE-SPECIFIC commands: $deviceSpecificTopic")
+                            Log.d(TAG, "📌 This device will respond to commands sent to: $deviceSpecificTopic")
+                            continuation.resume(Unit)
+                        },
+                        onFailure = { error ->
+                            Log.e(TAG, "❌ Failed to subscribe to device-specific commands: ${error.message}")
+                            continuation.resume(Unit)
+                        }
+                    )
+                }
+
+                Log.d(TAG, "")
+                Log.d(TAG, "📡 MQTT Command Subscription Summary:")
+                Log.d(TAG, "  • Broadcast topic: $broadcastTopic (for ALL devices)")
+                Log.d(TAG, "  • Device-specific topic: $deviceSpecificTopic (for THIS device only)")
+                Log.d(TAG, "  • Device ID: $deviceId")
+                Log.d(TAG, "")
             }
-
-            val deviceId = getDeviceId()
-
-            // Subscribe to BROADCAST commands topic (all devices)
-            val broadcastTopic = preferences.mqttTopicCommands.first()
-            mqttClient.subscribe(
-                topic = broadcastTopic,
-                qos = 1,
-                onMessageReceived = { topic, message ->
-                    Log.d(TAG, "📥 BROADCAST command received on [$topic]: $message")
-                    handleIncomingCommand(message, isBroadcast = true)
-                },
-                onSuccess = {
-                    Log.d(TAG, "✅ Subscribed to BROADCAST commands: $broadcastTopic")
-                },
-                onFailure = { error ->
-                    Log.e(TAG, "❌ Failed to subscribe to broadcast commands: ${error.message}")
-                }
-            )
-
-            // Subscribe to DEVICE-SPECIFIC commands topic
-            val deviceSpecificTopic = "fandomon/$deviceId/commands"
-            mqttClient.subscribe(
-                topic = deviceSpecificTopic,
-                qos = 1,
-                onMessageReceived = { topic, message ->
-                    Log.d(TAG, "📥 TARGETED command received on [$topic]: $message")
-                    handleIncomingCommand(message, isBroadcast = false)
-                },
-                onSuccess = {
-                    Log.d(TAG, "✅ Subscribed to DEVICE-SPECIFIC commands: $deviceSpecificTopic")
-                    Log.d(TAG, "📌 This device will respond to commands sent to: $deviceSpecificTopic")
-                },
-                onFailure = { error ->
-                    Log.e(TAG, "❌ Failed to subscribe to device-specific commands: ${error.message}")
-                }
-            )
-
-            Log.d(TAG, "")
-            Log.d(TAG, "📡 MQTT Command Subscription Summary:")
-            Log.d(TAG, "  • Broadcast topic: $broadcastTopic (for ALL devices)")
-            Log.d(TAG, "  • Device-specific topic: $deviceSpecificTopic (for THIS device only)")
-            Log.d(TAG, "  • Device ID: $deviceId")
-            Log.d(TAG, "")
         } catch (e: Exception) {
             Log.e(TAG, "Error subscribing to commands", e)
         }

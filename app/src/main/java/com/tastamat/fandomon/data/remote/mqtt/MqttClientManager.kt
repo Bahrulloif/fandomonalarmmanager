@@ -52,6 +52,8 @@ class MqttClientManager private constructor(private val context: Context) {
             options.password = password.toCharArray()
             options.connectionTimeout = 30
             options.keepAliveInterval = 60
+            options.isAutomaticReconnect = true  // Auto-reconnect on connection loss
+            options.maxReconnectDelay = 30000  // Max 30 seconds between reconnect attempts
 
             mqttClient?.connect(options)
             Log.d(TAG, "Connected to MQTT broker with client ID: $clientId")
@@ -107,7 +109,8 @@ class MqttClientManager private constructor(private val context: Context) {
             // Set callback for incoming messages
             mqttClient?.setCallback(object : MqttCallback {
                 override fun connectionLost(cause: Throwable?) {
-                    Log.w(TAG, "Connection lost: ${cause?.message}")
+                    Log.w(TAG, "⚠️ MQTT connection lost: ${cause?.message}")
+                    Log.i(TAG, "🔄 Auto-reconnect is enabled - client will reconnect automatically")
                 }
 
                 override fun messageArrived(topic: String?, message: MqttMessage?) {
