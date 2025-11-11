@@ -32,7 +32,7 @@ class MqttClientManager private constructor(private val context: Context) {
         try {
             // If already connected, reuse existing connection
             if (mqttClient?.isConnected == true) {
-                Log.d(TAG, "Already connected to MQTT broker - reusing connection")
+                Log.d(TAG, "✅ Already connected to MQTT broker - reusing connection")
                 onSuccess()
                 return
             }
@@ -44,7 +44,36 @@ class MqttClientManager private constructor(private val context: Context) {
                 android.provider.Settings.Secure.ANDROID_ID
             )}"
 
-            mqttClient = MqttClient(serverUri, clientId, MemoryPersistence())
+            // Only create NEW client if none exists OR if connection is permanently closed
+            if (mqttClient == null || mqttClient?.isConnected == false) {
+                // Check if we can reuse existing client with auto-reconnect
+                if (mqttClient != null) {
+                    try {
+                        // Try to reconnect existing client (auto-reconnect may be in progress)
+                        Log.d(TAG, "🔄 Attempting to reconnect existing MQTT client...")
+                        val options = MqttConnectOptions()
+                        options.isCleanSession = false  // Preserve subscriptions
+                        options.userName = username
+                        options.password = password.toCharArray()
+                        options.connectionTimeout = 30
+                        options.keepAliveInterval = 60
+                        options.isAutomaticReconnect = true  // Auto-reconnect on connection loss
+                        options.maxReconnectDelay = 30000  // Max 30 seconds between reconnect attempts
+
+                        mqttClient?.connect(options)
+                        Log.d(TAG, "✅ Reconnected existing MQTT client")
+                        onSuccess()
+                        return
+                    } catch (e: Exception) {
+                        Log.w(TAG, "⚠️ Failed to reconnect existing client, creating new one: ${e.message}")
+                        // Fall through to create new client
+                    }
+                }
+
+                // Create new client only if reconnect failed or no client exists
+                Log.d(TAG, "🆕 Creating new MQTT client...")
+                mqttClient = MqttClient(serverUri, clientId, MemoryPersistence())
+            }
 
             val options = MqttConnectOptions()
             options.isCleanSession = false  // Preserve subscriptions
