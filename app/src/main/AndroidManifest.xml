@@ -108,6 +108,17 @@
             </intent-filter>
         </receiver>
 
+        <!-- Screen State Receiver - Reconnect MQTT when screen turns on -->
+        <receiver
+            android:name=".receiver.ScreenStateReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.SCREEN_ON" />
+                <action android:name="android.intent.action.SCREEN_OFF" />
+            </intent-filter>
+        </receiver>
+
         <!-- MQTT Service -->
         <service
             android:name="org.eclipse.paho.android.service.MqttService"

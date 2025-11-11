@@ -3,6 +3,7 @@ package com.tastamat.fandomon
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -18,6 +19,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.runtime.*
 import com.tastamat.fandomon.data.preferences.AppPreferences
+import com.tastamat.fandomon.receiver.ScreenStateReceiver
 import com.tastamat.fandomon.service.DataSyncService
 import kotlinx.coroutines.Dispatchers
 import com.tastamat.fandomon.ui.screen.OnboardingScreen
@@ -29,6 +31,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    private var screenStateReceiver: ScreenStateReceiver? = null
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
