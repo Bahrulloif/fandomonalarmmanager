@@ -47,6 +47,8 @@ class CommandHandler(private val context: Context) {
                 "STOP_MONITORING" -> CommandType.STOP_MONITORING
                 "SEND_STATUS" -> CommandType.SEND_STATUS  // Alias for GET_STATUS
                 "SYNC_EVENTS" -> CommandType.SYNC_EVENTS  // Alias for FORCE_SYNC
+                "UPDATE_APP" -> CommandType.UPDATE_APP     // OTA update
+                "GET_VERSION" -> CommandType.GET_VERSION   // Request version info
 
                 else -> CommandType.UNKNOWN
             }
@@ -90,6 +92,8 @@ class CommandHandler(private val context: Context) {
             CommandType.STOP_MONITORING -> stopMonitoring()
             CommandType.SEND_STATUS -> sendImmediateStatus()  // Alias for GET_STATUS
             CommandType.SYNC_EVENTS -> forceSync()  // Alias for FORCE_SYNC
+            CommandType.UPDATE_APP -> updateApp(command.parameters)
+            CommandType.GET_VERSION -> getVersion()
 
             CommandType.UNKNOWN -> {
                 Log.w(TAG, "⚠️ Unknown command received")
@@ -405,6 +409,72 @@ class CommandHandler(private val context: Context) {
                     "COMMAND_STOP_MONITORING_FAILED",
                     "Failed to stop monitoring: ${e.message}"
                 )
+            }
+        }
+    }
+
+    private fun updateApp(parameters: Map<String, String>) {
+        Log.d(TAG, "📥 Executing UPDATE_APP command - OTA update")
+        try {
+            val apkUrl = parameters["apk_url"]
+            val version = parameters["version"]
+
+            if (apkUrl.isNullOrBlank()) {
+                Log.e(TAG, "❌ UPDATE_APP command missing required parameter: apk_url")
+                CoroutineScope(Dispatchers.IO).launch {
+                    logCommandEvent(
+                        "COMMAND_UPDATE_FAILED",
+                        "Update failed: apk_url parameter is required"
+                    )
+                }
+                return
+            }
+
+            Log.d(TAG, "📦 APK URL: $apkUrl")
+            version?.let { Log.d(TAG, "🔢 Target version: $it") }
+
+            // Use UpdateManager to download and install APK
+            val updateManager = UpdateManager(context)
+            updateManager.downloadAndInstallUpdate(apkUrl, version)
+
+            Log.d(TAG, "✅ UPDATE_APP command initiated - download started")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error executing UPDATE_APP: ${e.message}", e)
+            CoroutineScope(Dispatchers.IO).launch {
+                logCommandEvent(
+                    "COMMAND_UPDATE_FAILED",
+                    "Update failed: ${e.message}"
+                )
+            }
+        }
+    }
+
+    private fun getVersion() {
+        Log.d(TAG, "ℹ️ Executing GET_VERSION command")
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val versionName = com.tastamat.fandomon.BuildConfig.VERSION_NAME
+                val versionCode = com.tastamat.fandomon.BuildConfig.VERSION_CODE
+
+                val versionInfo = "Version: $versionName (build $versionCode)"
+                Log.d(TAG, "📱 $versionInfo")
+
+                // Create version event that will be sent via MQTT
+                val versionEvent = MonitorEvent(
+                    eventType = EventType.COMMAND_GET_VERSION,
+                    message = versionInfo
+                )
+                eventRepository.insertEvent(versionEvent)
+
+                Log.d(TAG, "✅ Version info logged - sending immediately via MQTT")
+
+                // Send version info immediately via DataSyncService
+                val dataSyncService = DataSyncService(context)
+                dataSyncService.syncEvents()
+
+                Log.d(TAG, "✅ Version sent via MQTT")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error executing GET_VERSION: ${e.message}", e)
             }
         }
     }

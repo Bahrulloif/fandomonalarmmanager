@@ -4,22 +4,21 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.tastamat.fandomon.data.preferences.AppPreferences
-import com.tastamat.fandomon.service.DataSyncService
+import com.tastamat.fandomon.data.local.FandomonDatabase
+import com.tastamat.fandomon.data.model.EventType
+import com.tastamat.fandomon.data.model.MonitorEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * Receiver that handles screen on/off events for MQTT reconnection
+ * Receiver that handles screen on/off events
  *
- * When screen turns ON:
- * - Reconnects MQTT to ensure remote control is available
- * - Resubscribes to command topics
+ * Logs screen state changes to database for monitoring:
+ * - ACTION_SCREEN_OFF → SCREEN_OFF event
+ * - ACTION_SCREEN_ON → SCREEN_ON event
  *
- * This ensures MQTT works reliably after device wakes from sleep,
- * without requiring background network activity while screen is off.
+ * This helps track device usage and debug issues related to sleep mode.
  */
 class ScreenStateReceiver : BroadcastReceiver() {
 
@@ -28,41 +27,34 @@ class ScreenStateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             Intent.ACTION_SCREEN_ON -> {
-                Log.d(TAG, "📱 Screen turned ON - reconnecting MQTT for remote control")
-                handleScreenOn(context)
+                Log.d(TAG, "📱 Screen turned ON")
+                logScreenEvent(context, EventType.SCREEN_ON, "Screen turned on")
             }
             Intent.ACTION_SCREEN_OFF -> {
-                Log.d(TAG, "📴 Screen turned OFF - MQTT will disconnect naturally")
-                // Do nothing - let Android disconnect MQTT to save battery
-                // We'll reconnect when screen turns on
+                Log.d(TAG, "📴 Screen turned OFF")
+                logScreenEvent(context, EventType.SCREEN_OFF, "Screen turned off")
             }
         }
     }
 
-    private fun handleScreenOn(context: Context) {
+    private fun logScreenEvent(context: Context, eventType: EventType, message: String) {
         val scope = CoroutineScope(Dispatchers.IO)
         scope.launch {
             try {
-                val preferences = AppPreferences(context)
-                val mqttEnabled = preferences.mqttEnabled.first()
+                val database = FandomonDatabase.getDatabase(context)
+                val eventDao = database.eventDao()
 
-                if (!mqttEnabled) {
-                    Log.d(TAG, "MQTT is disabled, skipping reconnection")
-                    return@launch
-                }
+                val event = MonitorEvent(
+                    eventType = eventType,
+                    timestamp = System.currentTimeMillis(),
+                    message = message,
+                    isSent = false
+                )
 
-                Log.d(TAG, "🔄 Initiating MQTT reconnection after screen wake...")
-
-                // Give Android a moment to restore network connectivity
-                kotlinx.coroutines.delay(2000)
-
-                // Reconnect and resubscribe to commands
-                val syncService = DataSyncService(context)
-                syncService.subscribeToCommands()
-
-                Log.d(TAG, "✅ MQTT reconnection initiated - device ready for remote control")
+                eventDao.insertEvent(event)
+                Log.d(TAG, "✅ Screen event logged: $eventType")
             } catch (e: Exception) {
-                Log.e(TAG, "Error reconnecting MQTT on screen wake: ${e.message}", e)
+                Log.e(TAG, "❌ Error logging screen event: ${e.message}", e)
             }
         }
     }

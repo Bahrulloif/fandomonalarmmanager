@@ -13,8 +13,8 @@ android {
         applicationId = "com.tastamat.fandomon"
         minSdk = 30
         targetSdk = 36
-        versionCode = 21
-        versionName = "2.4.3"
+        versionCode = 32
+        versionName = "2.5.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -37,6 +37,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

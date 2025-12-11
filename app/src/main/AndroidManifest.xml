@@ -31,11 +31,17 @@
     <!-- Full screen intent for critical notifications (app restart) on Android 10+ -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
+    <!-- Foreground service for persistent MQTT connection -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
     <!-- Read external storage for heartbeat check (logfile.txt in Download folder) -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
+
+    <!-- OTA update permissions -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:requestLegacyExternalStorage="true"
@@ -119,10 +125,25 @@
             </intent-filter>
         </receiver>
 
+        <!-- Installation Result Receiver - Handle OTA update installation results -->
+        <receiver
+            android:name=".service.UpdateManager$InstallResultReceiver"
+            android:enabled="true"
+            android:exported="true" />
+
         <!-- MQTT Service -->
         <service
             android:name="org.eclipse.paho.android.service.MqttService"
             android:exported="false" />
+
+        <!-- MQTT Foreground Service for persistent connection -->
+        <!-- Running in separate process to survive MainActivity crashes -->
+        <service
+            android:name=".service.MqttForegroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:process=":mqtt"
+            android:foregroundServiceType="dataSync" />
 
         <!-- Accessibility Service for automatic app launching (Android 10+) -->
         <service
@@ -136,6 +157,17 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+
+        <!-- FileProvider for OTA updates (sharing APK files for installation) -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 

@@ -21,6 +21,7 @@ import androidx.compose.runtime.*
 import com.tastamat.fandomon.data.preferences.AppPreferences
 import com.tastamat.fandomon.receiver.ScreenStateReceiver
 import com.tastamat.fandomon.service.DataSyncService
+import com.tastamat.fandomon.service.MqttForegroundService
 import kotlinx.coroutines.Dispatchers
 import com.tastamat.fandomon.ui.screen.OnboardingScreen
 import com.tastamat.fandomon.ui.screen.SettingsScreen
@@ -48,25 +49,32 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             Fandomon2Theme {
-                var showOnboarding by remember {
-                    mutableStateOf(
-                        !PermissionUtils.hasUsageStatsPermission(this) ||
-                        !PermissionUtils.isAccessibilityServiceEnabled(this) ||
-                        !PermissionUtils.hasStoragePermission(this)
-                    )
+                val preferences = remember { AppPreferences(this) }
+                var showOnboarding by remember { mutableStateOf(true) }
+
+                // Check if onboarding was already completed
+                LaunchedEffect(Unit) {
+                    val onboardingCompleted = preferences.onboardingCompleted.first()
+                    showOnboarding = !onboardingCompleted
+                    Log.d("MainActivity", "Onboarding completed: $onboardingCompleted, showOnboarding: $showOnboarding")
                 }
 
                 if (showOnboarding) {
                     OnboardingScreen(
                         onComplete = {
                             showOnboarding = false
+                            // Mark onboarding as completed
+                            lifecycleScope.launch {
+                                preferences.setOnboardingCompleted(true)
+                                Log.d("MainActivity", "Onboarding marked as completed")
+                            }
                             // Subscribe to MQTT after permissions granted
                             subscribeToMqttCommands()
                         }
                     )
                 } else {
                     SettingsScreen()
-                    // Subscribe to MQTT if permissions already granted
+                    // Subscribe to MQTT if onboarding already completed
                     LaunchedEffect(Unit) {
                         subscribeToMqttCommands()
                     }
@@ -123,14 +131,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun subscribeToMqttCommands() {
-        lifecycleScope.launch {
-            try {
-                val dataSyncService = DataSyncService(applicationContext)
-                dataSyncService.subscribeToCommands()
-                Log.d("MainActivity", "✅ Subscribed to MQTT commands")
-            } catch (e: Exception) {
-                Log.e("MainActivity", "❌ Error subscribing to commands: ${e.message}", e)
-            }
+        // Start MQTT Foreground Service for persistent connection
+        try {
+            MqttForegroundService.start(applicationContext)
+            Log.d("MainActivity", "✅ MQTT Foreground Service started")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "❌ Error starting MQTT service: ${e.message}", e)
         }
     }
 }

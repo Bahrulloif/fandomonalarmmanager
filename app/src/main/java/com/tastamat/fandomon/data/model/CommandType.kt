@@ -11,6 +11,8 @@ enum class CommandType {
     STOP_MONITORING,       // Stop monitoring (new format)
     SEND_STATUS,           // Alias for GET_STATUS (new format)
     SYNC_EVENTS,           // Alias for FORCE_SYNC (new format)
+    UPDATE_APP,            // OTA update - download and install new APK
+    GET_VERSION,           // Request app version info
     UNKNOWN                // Unknown command
 }
 

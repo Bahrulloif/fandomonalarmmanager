@@ -142,11 +142,20 @@ fun OnboardingScreen(
             }
 
             Button(
-                onClick = { if (allOk) onComplete() },
+                onClick = { onComplete() },
                 enabled = allOk,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Continue")
+            }
+
+            // Skip button for testing (always visible at bottom)
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(
+                onClick = { onComplete() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Skip and Continue Anyway")
             }
         }
     }

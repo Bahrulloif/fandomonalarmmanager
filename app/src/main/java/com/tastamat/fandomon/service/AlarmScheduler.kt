@@ -15,7 +15,7 @@ class AlarmScheduler(private val context: Context) {
     fun scheduleMonitoring(checkIntervalMinutes: Int, statusIntervalMinutes: Int) {
         scheduleFandomatCheck(checkIntervalMinutes)
         scheduleStatusReport(statusIntervalMinutes)
-        scheduleEventSync(5) // Sync events every 5 minutes
+        // scheduleEventSync(5) // DISABLED: Causes ANR, sync only via MQTT command or manual trigger
     }
 
     private fun scheduleFandomatCheck(intervalMinutes: Int) {

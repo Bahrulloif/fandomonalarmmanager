@@ -143,8 +143,9 @@ class FandomatMonitor(private val context: Context) {
                 return true
             }
 
-            // Parse timestamp from log line format: [2025-10-21 19:36:09] Log entry #2: application running normally
-            val timestampRegex = """\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]""".toRegex()
+            // Parse timestamp from log line format: 2025-11-11 16:58:36.627 [INFO] [863717050928204] WEB_ACTIVITY: ...
+            // Extract timestamp from beginning of line (with or without milliseconds)
+            val timestampRegex = """^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})""".toRegex()
             val matchResult = timestampRegex.find(lastLine)
 
             if (matchResult == null) {

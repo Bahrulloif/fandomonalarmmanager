@@ -4,10 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 
 class MonitoringReceiver : BroadcastReceiver() {
 
@@ -20,30 +18,35 @@ class MonitoringReceiver : BroadcastReceiver() {
 
         val pendingResult = goAsync()
 
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
             try {
-                when (intent.action) {
-                    ACTION_CHECK_FANDOMAT -> {
-                        Log.d(TAG, "🔔 Executing CHECK_FANDOMAT action")
-                        checkFandomat(context)
-                        // Reschedule next check (because setExactAndAllowWhileIdle is one-time)
-                        rescheduleNextAlarm(context, ACTION_CHECK_FANDOMAT)
-                    }
-                    ACTION_SEND_STATUS -> {
-                        Log.d(TAG, "🔔 Executing SEND_STATUS action")
-                        sendStatus(context)
-                        // Reschedule next status report
-                        rescheduleNextAlarm(context, ACTION_SEND_STATUS)
-                    }
-                    ACTION_SYNC_EVENTS -> {
-                        Log.d(TAG, "🔔 Executing SYNC_EVENTS action")
-                        syncEvents(context)
-                    }
-                    else -> {
-                        Log.w(TAG, "⚠️ Unknown action: ${intent.action}")
+                // Use withTimeout to prevent ANR (BroadcastReceiver has 10 second timeout)
+                withTimeout(8000) {
+                    when (intent.action) {
+                        ACTION_CHECK_FANDOMAT -> {
+                            Log.d(TAG, "🔔 Executing CHECK_FANDOMAT action")
+                            checkFandomat(context)
+                            // Reschedule next check (because setExactAndAllowWhileIdle is one-time)
+                            rescheduleNextAlarm(context, ACTION_CHECK_FANDOMAT)
+                        }
+                        ACTION_SEND_STATUS -> {
+                            Log.d(TAG, "🔔 Executing SEND_STATUS action")
+                            sendStatus(context)
+                            // Reschedule next status report
+                            rescheduleNextAlarm(context, ACTION_SEND_STATUS)
+                        }
+                        ACTION_SYNC_EVENTS -> {
+                            Log.d(TAG, "🔔 Executing SYNC_EVENTS action")
+                            syncEvents(context)
+                        }
+                        else -> {
+                            Log.w(TAG, "⚠️ Unknown action: ${intent.action}")
+                        }
                     }
                 }
                 Log.d(TAG, "🔔 Action completed successfully")
+            } catch (e: TimeoutCancellationException) {
+                Log.e(TAG, "⚠️ Operation timed out after 8 seconds - preventing ANR")
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Error in receiver: ${e.message}", e)
             } finally {
